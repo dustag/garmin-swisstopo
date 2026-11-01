@@ -1,0 +1,8 @@
+.venv/
+data/
+build/
+tools/
+__pycache__/
+*.img
+.env
+.vscode/

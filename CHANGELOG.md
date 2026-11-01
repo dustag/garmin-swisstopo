@@ -1,0 +1,28 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
+to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-11-01
+
+### Added
+
+- Resumable download of swissALTI3D tiles (area only), swissTLM3D, the swisstopo ski touring and snowshoe
+  routes, and mkgmap (`download.py`).
+- Base map: land cover, buildings, roads and paths with the Swiss hiking categories, streams, aerial
+  ropeways, railways, power lines, summits with elevation, passes, huts, place names.
+- 10/50/100 m contour lines and hill shading (`.hgt`) computed from swissALTI3D.
+- Transparent winter overlay with:
+  - slope classes over 30°;
+  - the ski touring network, with arrows oriented from the terrain model;
+  - SAC route numbers and grades;
+  - snowshoe routes;
+  - wildlife quiet zones and protection areas, with their allowed routes.
+- Single legend definition (`legend.py`) generating the mkgmap style and the TYP file.
+- Configurable label language (`fr`, `de`, `it`, `rm`, `en`) with a multilingual TYP legend.
+- Local configuration through `.env`.
+- First test area: Les Monts Telliers from the Grand-St-Bernard tunnel (`telliers`).

@@ -1,0 +1,9 @@
+numpy
+scipy
+scikit-image
+rasterio
+pyogrio
+geopandas
+shapely>=2
+pyproj
+python-dotenv
