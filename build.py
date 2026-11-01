@@ -329,7 +329,7 @@ def mkgmap(map_key, osm_file, family_id, priority, dem_dir=None, transparent=Fal
            f"--family-id={family_id}", "--product-id=1", f"--family-name={title}", f"--series-name={title}",
            f"--description={title}", f"--area-name={config.ZONE}", f"--draw-priority={priority}",
            "--copyright-message=(c) swisstopo, OFEV/BAFU, CAS/SAC", "--merge-lines", "--gmapsupp",
-           f"--mapname={config.MAP_ID_BASE + (family_id - config.FAMILY_ID) * 1000 + 1}"]
+           f"--mapname={config.MAP_ID + family_id - config.FAMILY_ID}"]
     if transparent:
         cmd.append("--transparent")
     if dem_dir:

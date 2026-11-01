@@ -24,6 +24,8 @@ JAVA_MAX_HEAP = os.environ.get("JAVA_MAX_HEAP", "4g")
 ZONES = {
     # Les Monts Telliers from the Grand-St-Bernard tunnel car park
     "telliers": (2_574_000, 1_079_000, 2_584_000, 1_088_000),
+    # Village of Chavornay (VD) and its municipality, for testing on the plain
+    "chavornay": (2_531_000, 1_170_000, 2_539_000, 1_177_000),
 }
 ZONE = os.environ.get("ZONE", "telliers")
 BBOX = ZONES[ZONE]
@@ -35,10 +37,13 @@ if LANG not in ("fr", "de", "it", "rm", "en"):
     raise ValueError(f"LANG_LABELS must be fr, de, it, rm or en (got {LANG!r})")
 DATA_LANG = "de" if LANG == "rm" else LANG
 
-# Garmin identifiers (family id must be unique among the maps on the device)
-FAMILY_ID = 6520
+# Garmin identifiers: family ids and map ids must be unique among the maps on
+# the device, so each area gets its own pair (base, winter) derived from its
+# position in ZONES. Append new areas at the end to keep existing ids stable.
+ZONE_INDEX = list(ZONES).index(ZONE)
+FAMILY_ID = 6520 + 2 * ZONE_INDEX          # base map; winter overlay = FAMILY_ID + 1
 FAMILY_NAME = "Swisstopo CAS"
-MAP_ID_BASE = 65200000
+MAP_ID = 65200000 + 10 * ZONE_INDEX        # base map; winter overlay = MAP_ID + 1
 
 STAC = "https://data.geo.admin.ch/api/stac/v0.9"
 SOURCES = {

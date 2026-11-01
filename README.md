@@ -150,10 +150,15 @@ the missing elevation tiles) and `build.py`:
 
 ```python
 ZONES = {
-    "telliers": (2_574_000, 1_079_000, 2_584_000, 1_088_000),
-    "arolla":   (2_600_000, 1_088_000, 2_612_000, 1_100_000),
+    "telliers":  (2_574_000, 1_079_000, 2_584_000, 1_088_000),
+    "chavornay": (2_531_000, 1_170_000, 2_539_000, 1_177_000),
+    "arolla":    (2_600_000, 1_088_000, 2_612_000, 1_100_000),
 }
 ```
+
+Each area gets its own Garmin family and map ids, derived from its position in `ZONES`, so maps of several
+areas can be installed side by side. **Always append new areas at the end** of the list: inserting one in
+the middle would change the ids of the following areas.
 
 ### Labels and languages
 

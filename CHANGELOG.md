@@ -7,6 +7,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Test area `chavornay` (village and municipality of Chavornay, VD).
+
+### Fixed
+
+- Each area now gets its own Garmin family and map ids, so maps of several areas no longer conflict on
+  the device.
+
 ## [0.1.0] - 2026-11-01
 
 ### Added
