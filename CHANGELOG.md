@@ -10,11 +10,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Test area `chavornay` (village and municipality of Chavornay, VD).
+- Fixed 10 km LV95 tile grid: each tile is built once, in parallel, cached, and has a fixed Garmin map id.
+- Coverages: named areas, `switzerland`, `canton:XX[,YY]` and `bbox:E0,N0,E1,N1`, through `--coverage` or
+  `COVERAGE` in `.env`.
+- Build options `--force` and `--jobs`.
+- Opaque background limited to Switzerland, so the map hides Garmin's TopoActive maps in Switzerland
+  only.
+
+### Changed
+
+- swissALTI3D is resampled to 5 m at download time and the 2 m originals deleted, which makes all of
+  Switzerland practical (~3.5 GB instead of ~40 GB).
+- Intermediate OSM files are gzipped.
+- Hill shading files are assembled from the tiles and zipped.
+- Draw priorities raised to 40 (base) and 41 (winter), above Garmin's own maps.
+- `ZONE` in `.env` is replaced by `COVERAGE`.
 
 ### Fixed
 
-- Each area now gets its own Garmin family and map ids, so maps of several areas no longer conflict on
-  the device.
+- Each coverage gets its own Garmin family id, so maps of several coverages no longer conflict on the
+  device.
+- Hill shading no longer warns about missing elevation files next to the map bounds.
 
 ## [0.1.0] - 2026-11-01
 
