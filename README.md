@@ -237,11 +237,24 @@ maps, eTrex, GPSMAP…) work the same way, with slightly different menu names.
 
 The maps then appear in hold **MENU** → **Map** → **Map Manager**.
 
-### 2. Garmin maps (TopoActive)
+### 2. Enable the maps per activity (summer / winter)
 
-On the fēnix 7X Pro, the Map Manager lets you delete the Garmin maps but not disable them. **Keep them**:
-the base map is drawn above them (draw priority 40) and is opaque over Switzerland, so TopoActive only
-shows outside Switzerland and outside the coverage. There, it remains useful as a fallback.
+On the fēnix 7X Pro, the Map Manager only lets you delete maps. Maps are enabled or disabled **for each
+activity**:
+
+1. Hold **MENU**.
+2. Select **Activities & Apps** → choose the activity → **Activity Settings** → **Map**.
+3. Select **Configure Maps** and toggle each installed map on or off for that activity.
+
+This is also how you switch seasons:
+
+| Activity | Swisstopo CAS base | Swisstopo CAS hiver | TopoActive |
+|---|---|---|---|
+| Summer: *Hike*, *Mountaineering*… | on | off | **off** |
+| Winter: *Backcountry Ski*, *Snowshoe*… | on | on | **off** |
+
+Turn TopoActive off in these activities: otherwise it may be drawn instead of the Swisstopo map. Don't
+delete it from the Map Manager, since it remains useful in other activities and abroad.
 
 ### 3. Recommended map settings
 
@@ -254,15 +267,7 @@ Hold **MENU** → **Map**:
 | Relief Shading | **On** | Uses the elevation model embedded in the base map |
 | Orientation | to taste (North up is closest to a paper map) | |
 
-### 4. Summer / winter
-
-The winter overlay is a separate map, drawn on top of the base map. If your firmware has no switch for
-custom maps, switch seasons by copying or removing the `…_hiver.img` file on the watch:
-
-- **Summer**: only the `…_base.img` file in `GARMIN`.
-- **Winter**: both `…_base.img` and `…_hiver.img`.
-
-### 5. Updating or removing
+### 4. Updating or removing
 
 To update a map, overwrite the `.img` files in `GARMIN` with the new versions; to remove it, delete them.
 A new version of the data (swissTLM3D is published every year, the ski routes several times a season)
@@ -273,9 +278,9 @@ only requires running `download.py` and `build.py --force` again.
 | Symptom | Cause / fix |
 |---|---|
 | The map does not appear in the Map Manager | File outside the `GARMIN` folder, or watch not restarted. Check the extension is `.img`. |
-| Garmin map shows instead of this one | An older build with a lower draw priority: replace the `.img` files with a current build |
+| Garmin map shows instead of this one (no hiking trails in yellow / red / blue, no cream background) | TopoActive still enabled for the activity: turn it off in *Configure Maps* |
 | Colours look like the Garmin map | Map Theme not set to *None* |
-| Slope stipple hides the terrain | Remove the winter overlay, or change `STIPPLE` in `legend.py` to a sparser pattern |
+| Slope stipple hides the terrain | Turn the winter overlay off for the activity, or change `STIPPLE` in `legend.py` to a sparser pattern |
 | No 10 m contour lines or labels | They only appear at the closest zoom levels; set Detail to *More* or *Most* |
 | Two coverages look mixed up | They share tiles (for example an area and its canton): install only one of them |
 
