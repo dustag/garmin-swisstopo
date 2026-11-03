@@ -1,8 +1,10 @@
 """Write shapely geometries (LV95) as OSM XML (WGS84) for mkgmap.
 
 mkgmap expects nodes before ways and relations: each section is written to a
-temporary file and they are concatenated on close.
+temporary file and they are concatenated on close (gzipped if the path ends
+with .gz, which mkgmap reads directly).
 """
+import gzip
 import shutil
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
@@ -22,9 +24,10 @@ class OsmWriter:
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._parts = [self.path.with_suffix(f".{s}.tmp") for s in ("n", "w", "r")]
+        self._parts = [self.path.with_name(f"{self.path.name}.{s}.tmp") for s in ("n", "w", "r")]
         self._nodes, self._ways, self._rels = (open(p, "w", encoding="utf-8") for p in self._parts)
         self._id = 0
+        self.count = 0   # number of tagged objects written
 
     def _next(self):
         self._id -= 1
@@ -80,6 +83,7 @@ class OsmWriter:
         """Dispatch on geometry type."""
         if geom is None or geom.is_empty:
             return
+        self.count += 1
         kind = geom.geom_type
         if "Point" in kind:
             for p in shapely.get_parts(geom):
@@ -95,7 +99,8 @@ class OsmWriter:
     def close(self):
         for f in (self._nodes, self._ways, self._rels):
             f.close()
-        with open(self.path, "w", encoding="utf-8") as out:
+        opener = gzip.open if self.path.suffix == ".gz" else open
+        with opener(self.path, "wt", encoding="utf-8") as out:
             out.write("<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6' generator='swisstopo-garmin'>\n")
             for p in self._parts:
                 with open(p, encoding="utf-8") as f:

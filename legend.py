@@ -69,16 +69,18 @@ DOTS = ["x---", "----", "--x-", "----"]
 # --- Base map (all seasons) -------------------------------------------------------
 
 BASE = [
-    # Polygons
-    Cat("rock", "polygon", 0x53, 20, pattern("#C9C2B8", DOTS, "#E4E0DA"), order=1, name=None),
-    Cat("scree", "polygon", 0x52, 20, pattern("#BDB5A8", ["x-----", "------", "---x--", "------"], "#EEEAE4"), order=1, name=None),
-    Cat("glacier", "polygon", 0x4D, 18, solid("#DCEFFA"), order=2),
-    Cat("forest", "polygon", 0x50, 18, solid("#B9DC9E"), order=2, name=None),
-    Cat("scrub", "polygon", 0x51, 20, pattern("#9CC97F", DOTS, "#DCEFCB"), order=2, name=None),
-    Cat("wetland", "polygon", 0x4C, 20, pattern("#5AA0D8", ["xxx-----", "--------", "----xxx-", "--------"], "#E8F3E0"), order=2, name=None),
-    Cat("lake", "polygon", 0x3C, 18, solid("#9CCFF0"), order=3),
-    Cat("river_area", "polygon", 0x46, 20, solid("#9CCFF0"), order=3, name=None),
-    Cat("building", "polygon", 0x13, 22, solid("#5A5A5A"), order=4, name=None),
+    # Polygons. "land" is an opaque background limited to Switzerland, so that the
+    # map hides Garmin's own maps there but lets them show through abroad.
+    Cat("land", "polygon", 0x01, 16, solid("#F7F5EE"), order=1, name=None),
+    Cat("rock", "polygon", 0x53, 20, pattern("#C9C2B8", DOTS, "#E4E0DA"), order=2, name=None),
+    Cat("scree", "polygon", 0x52, 20, pattern("#BDB5A8", ["x-----", "------", "---x--", "------"], "#EEEAE4"), order=2, name=None),
+    Cat("glacier", "polygon", 0x4D, 18, solid("#DCEFFA"), order=3),
+    Cat("forest", "polygon", 0x50, 18, solid("#B9DC9E"), order=3, name=None),
+    Cat("scrub", "polygon", 0x51, 20, pattern("#9CC97F", DOTS, "#DCEFCB"), order=3, name=None),
+    Cat("wetland", "polygon", 0x4C, 20, pattern("#5AA0D8", ["xxx-----", "--------", "----xxx-", "--------"], "#E8F3E0"), order=3, name=None),
+    Cat("lake", "polygon", 0x3C, 18, solid("#9CCFF0"), order=4),
+    Cat("river_area", "polygon", 0x46, 20, solid("#9CCFF0"), order=4, name=None),
+    Cat("building", "polygon", 0x13, 22, solid("#5A5A5A"), order=5, name=None),
 
     # Contour lines (types 0x20-0x22: label in feet, converted by the device)
     Cat("contour_minor", "line", 0x20, 23, line("#C9A27E", 1), name='${ele|conv:"m=>ft"}'),
@@ -151,6 +153,7 @@ LANGS = ("fr", "de", "it", "rm", "en")
 GARMIN_LANG = {"fr": 0x01, "de": 0x02, "en": 0x04, "it": 0x05}
 
 LABELS = {  # key: (fr, de, it, rm, en)
+    "land": ("Fond de carte", "Kartenhintergrund", "Sfondo", "Fund da la charta", "Map background"),
     "rock": ("Rocher", "Fels", "Roccia", "Grip", "Rock"),
     "scree": ("Éboulis", "Geröll", "Detriti", "Gonda", "Scree"),
     "glacier": ("Glacier", "Gletscher", "Ghiacciaio", "Glatscher", "Glacier"),
