@@ -7,6 +7,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-04
+
 ### Added
 
 - Italian Alps along the Swiss border (`ITALY_ZONES`): the provinces of Aosta, Verbano-Cusio-Ossola,
@@ -82,6 +84,7 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dustag/garmin-swisstopo/releases/tag/v0.1.0
