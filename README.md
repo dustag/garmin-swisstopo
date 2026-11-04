@@ -184,7 +184,7 @@ python gui.py
 Click the cantons, French departments and Italian zones to put in the map (wheel to zoom, drag to move),
 choose the maps (summer base map, winter overlay or both), the label language and the folders, then **Construire les cartes**: the window runs `download.py`
 and `build.py` and shows their log. The window is in the language chosen for the labels (French, German, Italian or
-English), and the choices are remembered for the next time. The departments and
+English; at first start, the system language, or English), and the choices are remembered for the next time. The departments and
 zones picked on the map are added to `FRANCE_DEPTS` and `ITALY_ZONES` for that build.
 
 ### Command line

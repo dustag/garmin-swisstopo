@@ -13,7 +13,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are picked on a map, with the label language, hill shading and folders; the window runs the download
   and the build, shows their log and progress, and can cancel them.
 - `build.py --maps base|hiver`: compile only the base map or only the winter overlay.
-- The window and the zone names follow the label language (French by default, German, Italian or English).
+- The window and the zone names follow the label language (French, German, Italian or English); at first
+  start, the system language, or English if it is none of them.
 
 ### Removed
 

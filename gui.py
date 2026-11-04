@@ -6,8 +6,8 @@ Downloads and builds run download.py and build.py in a child process whose outpu
 is shown in the window. Packaged (frozen) builds run the same executable with a
 "download" or "build" argument instead of the scripts.
 
-The window follows the language chosen for the map labels (French by default);
-its texts are translated in i18n.py.
+The window follows the language chosen for the map labels (at first start, the
+system language, or English); its texts are translated in i18n.py.
 """
 import importlib
 import math
@@ -19,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import (QLibraryInfo, QPointF, QProcess, QProcessEnvironment, QRectF, QSettings, Qt,
+from PySide6.QtCore import (QLibraryInfo, QLocale, QPointF, QProcess, QProcessEnvironment, QRectF, QSettings, Qt,
                             QTranslator, QUrl, Signal)
 from PySide6.QtGui import (QBrush, QColor, QDesktopServices, QFont, QFontDatabase, QFontMetricsF, QPainter,
                            QPainterPath, QPainterPathStroker, QPen, QPolygonF)
@@ -266,6 +266,17 @@ def file_size(mb: float) -> str:
     return i18n.decimal(f"{round(value, digits):.{digits}f}") + f" {unit}"
 
 
+def default_language() -> str:
+    """Language of a first start: LANG_LABELS if set (.env), else the first system language
+    the window knows, else English."""
+    if os.environ.get("LANG_LABELS"):
+        return config.LANG
+    for tag in QLocale.system().uiLanguages():   # e.g. ["de-CH", "en-US"]
+        if (lang := tag[:2].lower()) in LANGUAGES:
+            return lang
+    return "en"
+
+
 def child_command(step: str, args: list[str]) -> tuple[str, list[str]]:
     """Program and arguments running download.py or build.py."""
     if getattr(sys, "frozen", False):
@@ -309,8 +320,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = QSettings("swisstopo-garmin", "gui")
         s = self.settings
-        lang = s.value("lang", config.LANG)
-        i18n.language = lang if lang in LANGUAGES else "fr"
+        lang = s.value("lang", "")
+        i18n.language = lang if lang in LANGUAGES else default_language()
         self.qt_translator = QTranslator(self)
         self.process = None
         self.steps = []
