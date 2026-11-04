@@ -393,7 +393,7 @@ class MainWindow(QMainWindow):
         run_buttons.addWidget(self.start_button)
         run_buttons.addWidget(self.cancel_button)
         run_buttons.addWidget(self.open_button)
-        self.status = QLabel()
+        self.status = QLabel(wordWrap=True)
         self.progress = QProgressBar(textVisible=False)
         self.progress.setRange(0, 1)
         self.log = QPlainTextEdit(readOnly=True)
@@ -428,6 +428,17 @@ class MainWindow(QMainWindow):
         if s.contains("geometry"):
             self.restoreGeometry(s.value("geometry"))
 
+        # The options keep the same width in every language: that of the widest one
+        current, widths = i18n.language, []
+        for i18n.language in LANGUAGES:
+            self.retranslate()
+            # Take the new texts into account before measuring, nested layouts first
+            for widget in reversed([side] + side.findChildren(QWidget)):
+                if widget.layout():
+                    widget.layout().activate()
+            widths += [side.sizeHint().width(), self.advanced.sizeHint().width() + side_layout.contentsMargins().left() * 2]
+        i18n.language = current
+        side.setFixedWidth(max(widths))
         self.retranslate()
         keys = {tuple(k.split(":")) for k in s.value("zones", [], type=list)}
         self.map.set_selected(keys & set(self.map.items_by_key))
