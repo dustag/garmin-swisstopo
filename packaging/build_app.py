@@ -100,6 +100,31 @@ def size_mb(path: Path) -> float:
     return sum(p.stat().st_size for p in files) / 1e6
 
 
+def fix_macos_proj(frameworks: Path):
+    """Give pyproj its own PROJ library back.
+
+    The macOS wheels of pyproj and rasterio both hold a libproj.25.<x>.dylib with the same
+    name but built differently; PyInstaller keeps one, rasterio's, which lacks the symbols
+    pyproj needs. pyproj's .dylibs folder is copied as it is (its libraries refer to each
+    other by @loader_path) and pyproj's modules are pointed at its libproj again.
+    """
+    import pyproj
+    source = Path(pyproj.__file__).parent / ".dylibs"
+    own = frameworks / "pyproj" / "pyproj_dylibs"
+    remove(own)
+    shutil.copytree(source, own)
+    libproj = next(own.glob("libproj.*.dylib"))
+    fixed = list(own.glob("*.dylib"))
+    for module in (frameworks / "pyproj").rglob("*.so"):
+        deps = subprocess.run(["otool", "-L", str(module)], check=True, capture_output=True, text=True).stdout
+        for dep in re.findall(r"^\s+(\S*libproj\.[^\s]*\.dylib)", deps, re.M):
+            target = "@loader_path/" + os.path.relpath(libproj, module.parent)
+            subprocess.run(["install_name_tool", "-change", dep, target, str(module)], check=True)
+            fixed.append(module)
+    print(f"pyproj: own PROJ library for {len(fixed) - len(list(own.glob('*.dylib')))} modules")
+    subprocess.run(["codesign", "--force", "--sign", "-", *[str(f) for f in fixed]], check=True)
+
+
 def smoke_test(bundle: Path):
     """Run the packaged scripts (all their modules, GDAL included) and mkgmap with the bundled Java."""
     if sys.platform == "darwin":
@@ -131,6 +156,7 @@ def main():
     # The runtime and mkgmap go next to the Python modules, where config.py looks for them
     if sys.platform == "darwin":
         bundle = BUNDLES / f"{APP}.app"
+        fix_macos_proj(bundle / "Contents" / "Frameworks")
         # Contents/Frameworks may only hold code for codesign: like PyInstaller does for its
         # data, the folders go to Contents/Resources, with a link from Frameworks
         for name, src in (("jre", jre), ("tools", WORK / "tools")):
