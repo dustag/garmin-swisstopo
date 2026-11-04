@@ -31,6 +31,7 @@ from skimage.measure import find_contours
 
 import config
 import coverage
+import france
 import legend
 from coverage import Tile
 from osmwriter import OsmWriter
@@ -40,19 +41,23 @@ SKI = config.DOWNLOAD_DIR / "skitouren_2056.gpkg"
 SNOWSHOE = config.DOWNLOAD_DIR / "schneeschuhrouten_2056.gpkg"
 DEM_RES = 5.0     # m
 DEM_MARGIN = 100  # m of terrain read around a tile, so contours and slopes match across tiles
-TILE_FORMAT = 2   # bump to invalidate already built tiles when the tile content changes
+TILE_FORMAT = 3   # bump to invalidate already built tiles when the tile content changes
 
 
 # --- Digital elevation model -----------------------------------------------------
 
 class Dem:
-    """swissALTI3D at DEM_RES, smoothed, over a bbox; None-like when no data."""
+    """Terrain at DEM_RES over a bbox, smoothed; `ok` is False when there is no data.
+
+    swissALTI3D comes first, so Switzerland has priority; RGE ALTI (France) only
+    fills the cells swissALTI3D does not cover.
+    """
 
     def __init__(self, bbox):
         e0, n0, e1, n1 = bbox
-        files = [config.ALTI_DIR / f"{e}-{n}.tif"
-                 for e in range(int(e0 // 1000), int(-(-e1 // 1000)))
-                 for n in range(int(n0 // 1000), int(-(-n1 // 1000)))]
+        keys = [f"{e}-{n}" for e in range(int(e0 // 1000), int(-(-e1 // 1000)))
+                for n in range(int(n0 // 1000), int(-(-n1 // 1000)))]
+        files = [d / f"{k}.tif" for d in (config.ALTI_DIR, config.ALTI_FR_DIR) for k in keys]
         files = [f for f in files if f.exists()]
         self.ok = bool(files)
         if not self.ok:
@@ -67,6 +72,7 @@ class Dem:
         if not self.valid.all():
             idx = distance_transform_edt(~self.valid, return_distances=False, return_indices=True)
             z = z[tuple(idx)]
+        self.raw = z   # unsmoothed, for spot heights
         self.z = gaussian_filter(z, sigma=1.0)
         self.transform = transform
         self.left, self.top = transform.c, transform.f
@@ -74,7 +80,7 @@ class Dem:
     def to_xy(self, rows, cols):
         return self.left + (cols + 0.5) * DEM_RES, self.top - (rows + 0.5) * DEM_RES
 
-    def sample(self, x, y):
+    def sample(self, x, y, raw=False):
         """Bilinear elevation at LV95 coordinates; NaN outside valid data."""
         x, y = np.asarray(x, float), np.asarray(y, float)
         if not self.ok:
@@ -82,7 +88,7 @@ class Dem:
         rows = (self.top - y) / DEM_RES - 0.5
         cols = (x - self.left) / DEM_RES - 0.5
         inside = (rows >= 0) & (rows <= self.z.shape[0] - 1) & (cols >= 0) & (cols <= self.z.shape[1] - 1)
-        out = map_coordinates(self.z, [rows, cols], order=1, mode="nearest")
+        out = map_coordinates(self.raw if raw else self.z, [rows, cols], order=1, mode="nearest")
         ok = inside & map_coordinates(self.valid.astype("uint8"), [rows, cols], order=0, mode="nearest").astype(bool)
         return np.where(ok, out, np.nan)
 
@@ -389,35 +395,50 @@ def tile_osm(tile: Tile, layer_key: str):
     return config.TILES_DIR / tile.name / f"{tile.map_id(dict(LAYERS)[layer_key])}.osm.gz"
 
 
+def french_depts(tile: Tile):
+    """French departments with downloaded data that have land in the tile."""
+    box = shapely.box(*tile.bounds)
+    return [c for c in config.FRANCE_DEPTS if france.is_ready(c) and coverage.department(c).intersects(box)]
+
+
 def build_tile(tile: Tile, force=False):
     """Build the OSM files and elevation samples of one tile; returns a status dict."""
     out = config.TILES_DIR / tile.name
     status_file = out / "status.json"
+    depts = french_depts(tile)
     if not force and status_file.exists():
         status = json.loads(status_file.read_text())
-        if status.get("format") == TILE_FORMAT and status.get("lang") == config.LANG:
+        if (status.get("format"), status.get("lang"), status.get("fr", [])) == (TILE_FORMAT, config.LANG, depts):
             return status | {"cached": True}
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
 
     ctx = TileContext(tile)
+    in_ch = coverage.switzerland().intersects(shapely.box(*tile.bounds))
+    french = [ft for ft in (france.FrenchTile(ctx, c) for c in depts) if not ft.empty]
     e0, n0, e1, n1 = tile.bounds
     dem = Dem((e0 - DEM_MARGIN, n0 - DEM_MARGIN, e1 + DEM_MARGIN, n1 + DEM_MARGIN))
     counts = {}
     with OsmWriter(tile_osm(tile, "base")) as osm:
         if dem.ok:
             write_contours(dem, osm, ctx.clip)
-        write_base(ctx, osm)
+        if in_ch:
+            write_base(ctx, osm)
+        for ft in french:
+            france.write_base(ft, osm, dem)
         counts["base"] = osm.count
     with OsmWriter(tile_osm(tile, "hiver")) as osm:
         if dem.ok:
             write_slopes(dem, osm, ctx.clip)
-        write_ski(ctx, osm, dem)
-        write_wildlife(ctx, osm)
+        if in_ch:
+            write_ski(ctx, osm, dem)
+            write_wildlife(ctx, osm)
+        for ft in french:
+            france.write_winter(ft, osm)
         counts["hiver"] = osm.count
     if dem.ok:
         np.savez_compressed(out / "hgt.npz", **hgt_samples(dem, tile))
-    status = {"tile": tile.name, "format": TILE_FORMAT, "lang": config.LANG, "counts": counts}
+    status = {"tile": tile.name, "format": TILE_FORMAT, "lang": config.LANG, "fr": depts, "counts": counts}
     status_file.write_text(json.dumps(status))
     return status
 
@@ -425,7 +446,10 @@ def build_tile(tile: Tile, force=False):
 def build_tiles(cov: coverage.Coverage, jobs: int, force: bool):
     if TLM is None:
         raise SystemExit("swissTLM3D not found: run download.py first")
-    coverage.switzerland()   # fetch and cache the outline once, before the workers start
+    # Fetch and cache the outlines once, before the workers start
+    coverage.switzerland()
+    for code in config.FRANCE_DEPTS:
+        coverage.department(code)
     done = 0
     with ProcessPoolExecutor(jobs) as pool:
         futures = {pool.submit(build_tile, t, force): t for t in cov.tiles}
@@ -458,16 +482,18 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
     legend.write_typ(layer_key, typ, family_id, config.LANG)
 
     title = f"{config.FAMILY_NAME} {layer_key} {cov.name}"
-    cmd = [config.JAVA, f"-Xmx{config.JAVA_MAX_HEAP}", "-jar", str(MKGMAP),
-           f"--output-dir={out}", f"--style-file={style}", "--code-page=1252", f"--max-jobs={jobs}",
-           f"--family-id={family_id}", "--product-id=1", f"--family-name={title}", f"--series-name={title}",
-           f"--area-name={cov.name}", f"--draw-priority={DRAW_PRIORITY[layer_key]}",
-           "--copyright-message=(c) swisstopo, OFEV/BAFU, CAS/SAC", "--merge-lines",
-           # Both maps are transparent: the base map is made opaque by its "land"
-           # polygon over Switzerland only, so other maps still show abroad.
-           "--transparent"]
+    # Options go to a config file (mkgmap -c): with hundreds of tiles, the command
+    # line would exceed the Windows length limit.
+    opts = [f"output-dir={out}", f"style-file={style}", "code-page=1252", f"max-jobs={jobs}",
+            f"family-id={family_id}", "product-id=1", f"family-name={title}", f"series-name={title}",
+            f"area-name={cov.name}", f"draw-priority={DRAW_PRIORITY[layer_key]}",
+            "copyright-message=(c) swisstopo, OFEV/BAFU, CAS/SAC, IGN, OpenStreetMap, Camptocamp",
+            "merge-lines",
+            # Both maps are transparent: the base map is made opaque by its "land"
+            # polygon over Switzerland only, so other maps still show abroad.
+            "transparent"]
     if dem_dir:
-        cmd += [f"--dem={dem_dir}", f"--dem-dists={DEM_DISTS}", "--show-profiles=1"]
+        opts += [f"dem={dem_dir}", f"dem-dists={DEM_DISTS}", "show-profiles=1"]
     inputs = 0
     for t in cov.tiles:
         status_file = config.TILES_DIR / t.name / "status.json"
@@ -475,14 +501,18 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
             raise SystemExit(f"tile {t.name} not built: run build.py --step osm first")
         status = json.loads(status_file.read_text())
         if status["counts"][layer_key]:   # skip empty tiles
-            cmd += [f"--mapname={t.map_id(dict(LAYERS)[layer_key])}", f"--description={title} {t.name}",
-                    str(tile_osm(t, layer_key))]
+            # Garmin descriptions are limited to 50 characters
+            opts += [f"mapname={t.map_id(dict(LAYERS)[layer_key])}", f"description={f'{title} {t.name}'[-50:]}",
+                     f"input-file={tile_osm(t, layer_key)}"]
             inputs += 1
     if not inputs:
         print(f"  no {layer_key} data in this coverage, skipped")
         return
-    cmd += [f"--description={title}", "--gmapsupp", str(typ)]
-    subprocess.run(cmd, check=True)
+    opts += [f"description={title[:50]}", "gmapsupp", f"input-file={typ}"]
+    args_file = work / f"{layer_key}.mkgmap.args"
+    args_file.write_text("\n".join(opts) + "\n", encoding="utf-8")
+    subprocess.run([config.JAVA, f"-Xmx{config.JAVA_MAX_HEAP}", "-jar", str(MKGMAP), "-c", str(args_file)],
+                   check=True)
     dest = config.OUTPUT_DIR / f"swisstopo_{cov.name}_{layer_key}.img"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(out / "gmapsupp.img", dest)

@@ -9,6 +9,8 @@ originals deleted: all of Switzerland takes ~40 GB at 2 m, a few GB at 5 m.
 import argparse
 import json
 import sys
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -19,8 +21,11 @@ import rasterio
 from pyproj import Transformer
 from rasterio.enums import Resampling
 
+import shapely
+
 import config
 import coverage
+import france
 
 ALTI_RES = 5  # m
 LEGACY_2M_DIR = config.DOWNLOAD_DIR / "alti3d"   # 2 m tiles kept by earlier versions
@@ -29,13 +34,15 @@ LEGACY_2M_DIR = config.DOWNLOAD_DIR / "alti3d"   # 2 m tiles kept by earlier ver
 def fetch(url: str, dest: Path, quiet=False) -> Path:
     """Download url to dest, resuming a partial transfer if any."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    head = urllib.request.urlopen(urllib.request.Request(url, method="HEAD"))
+    # Some servers (IGN) reject Python's default user agent
+    headers = {"User-Agent": config.USER_AGENT}
+    head = urllib.request.urlopen(urllib.request.Request(url, method="HEAD", headers=headers))
     total = int(head.headers.get("Content-Length", 0))
     if dest.exists() and dest.stat().st_size == total:
         return dest
     part = dest.with_name(dest.name + ".part")
     done = part.stat().st_size if part.exists() else 0
-    req = urllib.request.Request(url, headers={"Range": f"bytes={done}-"} if done else {})
+    req = urllib.request.Request(url, headers=headers | ({"Range": f"bytes={done}-"} if done else {}))
     show = total > 50e6 and not quiet
     with urllib.request.urlopen(req) as r, open(part, "ab" if done else "wb") as f:
         while chunk := r.read(1 << 20):
@@ -107,7 +114,14 @@ def get_alti(key, href):
     if dest.exists():
         return
     legacy = next(LEGACY_2M_DIR.glob(f"swissalti3d_*_{key}_2_2056_5728.tif"), None) if LEGACY_2M_DIR.exists() else None
-    src = legacy or fetch(href, config.DOWNLOAD_DIR / "alti3d_tmp" / Path(href).name, quiet=True)
+    for attempt in range(4):   # thousands of small files: retry transient network errors
+        try:
+            src = legacy or fetch(href, config.DOWNLOAD_DIR / "alti3d_tmp" / Path(href).name, quiet=True)
+            break
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == 3:
+                raise
+            time.sleep(10 * (attempt + 1))
     to_5m(src, dest)
     src.unlink()
 
@@ -138,6 +152,13 @@ def main():
             continue
         print(f"{key}: {url}")
         unzip(fetch(url, archive))
+
+    # French departments touching the coverage
+    tiles = shapely.union_all([shapely.box(*t.bounds) for t in cov.tiles])
+    for code in config.FRANCE_DEPTS:
+        if coverage.department(code).intersects(tiles) and not france.is_ready(code):
+            print(f"France, department {code}:")
+            france.download_dept(code, fetch)
 
     unzip(fetch("https://www.mkgmap.org.uk/download/mkgmap-latest.zip", config.TOOLS_DIR / "mkgmap-latest.zip"))
     print("Downloads complete.")

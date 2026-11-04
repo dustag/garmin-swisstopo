@@ -6,12 +6,25 @@ ski touring and snowshoe routes, and wildlife quiet zones.
 
 It was written for mountain leaders of the Swiss Alpine Club (SAC/CAS), who need a map that sticks to the
 Swiss national map content in summer as well as in winter. Maps can cover a small area, one or several
-cantons, or all of Switzerland.
+cantons, all of Switzerland, and **French departments** (tested with Haute-Savoie) built from the open
+data of IGN, OpenStreetMap and Camptocamp. Swiss data always has priority: French data only fills the
+area outside Switzerland, and the terrain is seamless across the border.
 
 | Map | Content | When to use it |
 |---|---|---|
 | `swisstopo_<coverage>_base.img` | Contour lines (10/50/100 m), rock, scree, glaciers, forest, water, buildings, roads, paths with the Swiss hiking colours (yellow / red / blue), aerial ropeways, summits with elevation, passes, huts, place names, hill shading | All year |
 | `swisstopo_<coverage>_hiver.img` | Transparent overlay: slope classes 30-35° / 35-40° / 40-45° / > 45°, ski touring network with uphill/downhill arrows, "on foot" and "increased caution" sections, route numbers with SAC grade, snowshoe routes, wildlife quiet zones and protection areas with their allowed routes | Winter |
+
+In France the content is as close as the open data allows:
+
+| | Switzerland | France |
+|---|---|---|
+| Terrain, contours, slopes, hill shading | swissALTI3D | IGN RGE ALTI 5 m |
+| Land cover, roads, paths, water, buildings, names | swissTLM3D | IGN BD TOPO |
+| Rock and scree areas | swissTLM3D | OpenStreetMap |
+| Marked hiking routes | Swiss hiking categories (yellow / red / blue) | BD TOPO routes: GR in red, other routes in yellow |
+| Ski touring routes | swisstopo / SAC network | Camptocamp: track when available, otherwise a point with the route name and grade |
+| Wildlife | Quiet zones and protection areas (FOEN) | Nature reserves, protection orders and wildlife reserve (BD TOPO), without periods |
 
 Vector maps are much smaller than raster maps of the same area and stay sharp at every zoom level: a
 mountain area of 400 km² takes about 6 MB (base and winter overlay together).
@@ -97,8 +110,9 @@ flowchart LR
 | File | Role |
 |---|---|
 | `config.py` | Settings: paths and options from `.env`, tile size, named areas and Garmin family ids, dataset URLs |
-| `coverage.py` | Tile grid, Garmin map ids, resolution of a coverage (area, canton, Switzerland, bbox) into tiles |
-| `download.py` | Downloads and resamples swissALTI3D, downloads swissTLM3D, the ski/snowshoe routes and mkgmap |
+| `coverage.py` | Tile grid, Garmin map ids, resolution of a coverage (area, canton, Switzerland, department, bbox) into tiles |
+| `download.py` | Downloads and resamples swissALTI3D, downloads swissTLM3D, the ski/snowshoe routes, the French departments and mkgmap |
+| `france.py` | French departments: download (BD TOPO, RGE ALTI, OpenStreetMap, Camptocamp) and conversion to the map categories |
 | `build.py` | Pipeline: per-tile terrain model, contours, slopes, base data, winter data, hill shading, mkgmap call |
 | `legend.py` | Map legend: Garmin types, zoom levels, colours/patterns, translated labels; generates style and TYP |
 | `osmwriter.py` | Writes shapely geometries (LV95) to OSM XML (WGS84), including multipolygons with holes |
@@ -112,6 +126,8 @@ DATA_DIR/
 ├── download/
 │   ├── alti3d_5m/         swissALTI3D at 5 m, one file per km² (~85 KB/km², ~3.5 GB for Switzerland)
 │   ├── swisstlm3d_…/      swissTLM3D (≈ 11 GB unzipped)
+│   ├── rgealti_5m/        RGE ALTI reprojected to LV95, 5 m, one file per km²
+│   ├── fr/<dept>/         BD TOPO, OpenStreetMap rock, Camptocamp routes, outline of the department
 │   └── …                  route datasets, Switzerland outline
 ├── work/
 │   ├── tiles/<E>-<N>/     per tile: base and winter OSM, elevation samples, status (shared by coverages)
@@ -146,6 +162,7 @@ Edit `.env`:
 | `JAVA_MAX_HEAP` | Memory for mkgmap | `4g` |
 | `COVERAGE` | Default coverage (see below) | `telliers` |
 | `LANG_LABELS` | Language of the labels: `fr`, `de`, `it`, `rm` or `en` | `fr` |
+| `FRANCE_DEPTS` | French departments whose data is used, comma-separated | `74` |
 
 ### Build
 
@@ -175,10 +192,17 @@ The maps are written to `OUTPUT_DIR`, for example `swisstopo_telliers_base.img` 
 | Named area of `config.AREAS` | `telliers`, `chavornay` | `Swisstopo CAS base telliers` | set in `AREAS` (6530, 6532…) |
 | All of Switzerland and Liechtenstein | `switzerland` | `Swisstopo CAS base suisse` | 6520 |
 | One or several cantons | `canton:VS`, `canton:VS,VD` | `Swisstopo CAS base vs-vd` | 6600 + 2 × canton index |
+| One or several French departments | `dept:74` | `Swisstopo CAS base fr74` | 6700 + 2 × department number |
 | Any rectangle (LV95 metres) | `bbox:2570000,1080000,2600000,1100000` | `Swisstopo CAS base custom` | 6590 |
+| Several of the above, joined with `+` | `canton:VS+dept:74` | `Swisstopo CAS base vs+fr74` | 7000 + 2 × (hash of the coverage % 1000) |
 
-Orders of magnitude: Switzerland is about 500 tiles, Valais about 80. Built tiles are cached, so after the
-first build a legend change only needs `--step mkgmap`.
+Orders of magnitude: Switzerland is about 500 tiles, Valais about 80, Haute-Savoie about 70. Built tiles are
+cached, so after the first build a legend change only needs `--step mkgmap`.
+
+A French department is downloaded the first time a coverage touches it, if it is listed in
+`FRANCE_DEPTS` (≈ 600 MB to download per department; among the downloads, the Camptocamp routes take a few minutes because the
+API is queried gently). Tiles on the border then contain both countries; tiles built before the
+department was available are rebuilt automatically.
 
 To add a named area, add an entry to `AREAS` in `config.py` with an unused **even** family id and the
 bounding box in LV95 metres (read the coordinates on [map.geo.admin.ch](https://map.geo.admin.ch)):
@@ -194,8 +218,9 @@ AREAS = {
 The bounding box is rounded up to whole 10 km tiles.
 
 Maps of different coverages can be installed side by side, as long as they don't overlap. Don't install
-two coverages sharing tiles, for example `telliers` and `canton:VS`, at the same time: they contain the
-same Garmin tiles.
+two coverages sharing tiles, for example `telliers` and `canton:VS`, or `canton:VS` and `dept:74` (they
+share the border tiles), at the same time: they contain the same Garmin tiles. Build one combined coverage
+instead, such as `canton:VS+dept:74`.
 
 ### Labels and languages
 
@@ -300,16 +325,27 @@ share them:
 | swissTLM3D, swissALTI3D, swissBOUNDARIES3D | © swisstopo | [Open Government Data, free use with attribution](https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices) |
 | Ski touring and snowshoe routes | © swisstopo, with the Swiss Alpine Club SAC | Same terms |
 | Wildlife quiet zones, wildlife protection areas | © FOEN / BAFU, cantons | [geo.admin.ch terms of use](https://www.geo.admin.ch/en/general-terms-of-use-fsdi) |
+| BD TOPO, RGE ALTI | © IGN | [Licence Ouverte / Etalab 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/), attribution |
+| Department outlines | geo.api.gouv.fr (IGN Admin Express) | Licence Ouverte / Etalab 2.0 |
+| Rock and scree areas in France | © OpenStreetMap contributors | [ODbL](https://www.openstreetmap.org/copyright), attribution |
+| Ski touring routes in France | © Camptocamp.org contributors | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/): attribution, and maps you share must use the same licence |
 | mkgmap (map compiler, not redistributed) | mkgmap contributors | GPL v2 |
 
-This project is not affiliated with swisstopo, the FOEN or the Swiss Alpine Club.
+This project is not affiliated with swisstopo, the FOEN, the Swiss Alpine Club, IGN, OpenStreetMap or
+Camptocamp.
 
 ---
 
 ## Limitations and ideas
 
-- swissTLM3D and swissALTI3D stop at the Swiss border. A border strip could be added from
-  OpenStreetMap and the Copernicus 30 m DEM, or from IGN data (BD TOPO, RGE ALTI) for France.
+- Outside Switzerland, only the French departments listed in `FRANCE_DEPTS` are covered. Italy, Germany and
+  Austria stop at the border; they could be added from OpenStreetMap and the Copernicus 30 m DEM.
+- In France, only about a quarter of the Camptocamp ski touring routes have a track; the others are shown
+  as a point. Camptocamp is a community database: tracks and grades are indicative.
+- French nature reserves are drawn without their rules or periods. Check them, and the sensitive areas
+  of [Biodiv'Sports](https://biodiv-sports.fr/), before each trip.
+- Elevations in France (IGN69) and Switzerland (LN02) use different height systems; the difference, a few
+  decimetres, is not corrected.
 - Hill shading and the half-transparent slope patterns depend on the device firmware; they still have to
   be validated on the fēnix 7X Pro.
 - The Romansh legend labels are a first draft and need proofreading by a native speaker.
