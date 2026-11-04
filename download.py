@@ -167,7 +167,9 @@ def main():
         print(f"Italy, zones {', '.join(zones)}:")
         italy.download_zones(zones, fetch)
 
-    unzip(fetch("https://www.mkgmap.org.uk/download/mkgmap-latest.zip", config.TOOLS_DIR / "mkgmap-latest.zip"))
+    # Already there in the packaged application, whose folder is read-only
+    if not next(config.TOOLS_DIR.glob("mkgmap-latest/mkgmap-*/mkgmap.jar"), None):
+        unzip(fetch("https://www.mkgmap.org.uk/download/mkgmap-latest.zip", config.TOOLS_DIR / "mkgmap-latest.zip"))
     print("Downloads complete.")
 
 

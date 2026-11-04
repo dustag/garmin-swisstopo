@@ -1,0 +1,52 @@
+# Standalone application for Windows and macOS (packaging/build_app.py).
+# Attached to the GitHub release when one is published. Also runs, with the archives as
+# workflow artifacts, on each push changing the packaging, and by hand (Actions > Package >
+# Run workflow, once this file is on the default branch).
+name: Package
+
+on:
+  release:
+    types: [published]
+  push:
+    paths:
+      - "packaging/**"
+      - ".github/workflows/package.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-15: Apple silicon; macos-15-intel: Intel, the last x86_64 runner of GitHub.
+        # macOS 15 at least: older ones have no wheels of rasterio and pyproj for Python 3.14
+        os: [windows-latest, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-java@v4   # JDK for jlink
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r packaging/requirements.txt
+      - name: Build the application
+        run: python packaging/build_app.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swisstopo-garmin-${{ matrix.os }}
+          path: |
+            dist/*.zip
+            dist/*.dmg
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/swisstopo-garmin-* --clobber

@@ -24,7 +24,9 @@ TILES_DIR = WORK_DIR / "tiles"             # per-tile intermediates, shared by a
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", DATA_DIR / "output")).expanduser()
 TOOLS_DIR = Path(os.environ.get("TOOLS_DIR", REPO_DIR / "tools")).expanduser()
 
-JAVA = os.environ.get("JAVA_EXE", "java")
+# Java: JAVA_EXE, else the runtime bundled with the packaged application, else java from the PATH
+_BUNDLED_JAVA = REPO_DIR / "jre" / "bin" / ("java.exe" if os.name == "nt" else "java")
+JAVA = os.environ.get("JAVA_EXE") or (str(_BUNDLED_JAVA) if _BUNDLED_JAVA.exists() else "java")
 JAVA_MAX_HEAP = os.environ.get("JAVA_MAX_HEAP", "4g")
 
 # Coverage to build: an area name, "switzerland", "canton:VS[,VD...]", "dept:74[,73...]"

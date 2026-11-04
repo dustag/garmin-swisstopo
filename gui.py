@@ -3,15 +3,13 @@
     python gui.py
 
 Downloads and builds run download.py and build.py in a child process whose output
-is shown in the window. Packaged (frozen) builds run the same executable with a
-"download" or "build" argument instead of the scripts.
+is shown in the window. The packaged application (packaging/launcher.py) runs its
+own executable with a "download" or "build" argument instead of the scripts.
 
 The window follows the language chosen for the map labels (at first start, the
 system language, or English); its texts are translated in i18n.py.
 """
-import importlib
 import math
-import multiprocessing
 import os
 import re
 import shutil
@@ -381,7 +379,9 @@ class MainWindow(QMainWindow):
         form.addRow(self.labels["Dossier des cartes"], self.output_dir)
         form.addRow("", self.show_advanced)
 
-        self.java = PathEdit(s.value("java", config.JAVA), folder=False)
+        # Empty: the default of config.py (bundled runtime of the packaged application, which may move)
+        self.java = PathEdit(s.value("java", ""), folder=False)
+        self.java.edit.setPlaceholderText(config.JAVA)
         self.jobs = QSpinBox(minimum=1, maximum=os.cpu_count() or 1)
         self.jobs.setValue(s.value("jobs", max(1, (os.cpu_count() or 2) - 1), type=int))
         self.force = QCheckBox()
@@ -545,7 +545,8 @@ class MainWindow(QMainWindow):
         if self.output_dir.text():
             env.insert("OUTPUT_DIR", self.output_dir.text())
         env.insert("LANG_LABELS", self.lang.currentData())
-        env.insert("JAVA_EXE", self.java.text() or "java")
+        if self.java.text():
+            env.insert("JAVA_EXE", self.java.text())
         # The neighbours' data must include every selected zone
         selected = self.map.selected()
         depts = dict.fromkeys(config.FRANCE_DEPTS + [z["code"] for z in selected if z["country"] == "fr"])
@@ -563,7 +564,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("Aucune carte"),
                                     tr("Choisissez la carte d'été, la surcouche d'hiver ou les deux."))
             return
-        java = self.java.text() or "java"
+        java = self.java.text() or config.JAVA
         if not (shutil.which(java) or Path(java).is_file()):
             QMessageBox.warning(self, tr("Java introuvable"),
                                 tr("Java est nécessaire pour compiler les cartes (mkgmap).\n\n"
@@ -648,7 +649,8 @@ class MainWindow(QMainWindow):
         self.steps = None
         pid = self.process.processId()
         if os.name == "nt":   # the build starts worker processes and Java: stop the whole tree
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
         else:
             self.process.kill()
 
@@ -671,11 +673,6 @@ class MainWindow(QMainWindow):
 
 
 def main():
-    multiprocessing.freeze_support()
-    if len(sys.argv) > 1 and sys.argv[1] in ("download", "build"):   # child process of a packaged build
-        module = importlib.import_module(sys.argv[1])
-        sys.argv = [f"{sys.argv[1]}.py"] + sys.argv[2:]
-        sys.exit(module.main())
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

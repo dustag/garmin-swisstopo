@@ -7,6 +7,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-04
+
+### Added
+
+- Standalone application for Windows (folder in a zip) and macOS, Apple silicon and Intel (app in a dmg),
+  with Python, the libraries, a minimal Java runtime and mkgmap: `packaging/build_app.py`, and a GitHub
+  workflow that builds the three and attaches them to each published release.
+
+### Changed
+
+- The bundled Java runtime is used when `JAVA_EXE` is not set; the window keeps the Java field empty by
+  default.
+- `download.py` no longer downloads mkgmap when it is already there.
+- Java runs without a console window when the build is started from the window on Windows.
+
 ## [0.4.0] - 2026-11-04
 
 ### Added
@@ -100,7 +115,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.1.0...v0.2.0
