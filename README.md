@@ -120,6 +120,8 @@ flowchart LR
 | `italy.py` | Italian zones: download (OpenStreetMap, TINITALY, Camptocamp) and conversion to the map categories |
 | `build.py` | Pipeline: per-tile terrain model, contours, slopes, base data, winter data, hill shading, mkgmap call |
 | `legend.py` | Map legend: Garmin types, zoom levels, colours/patterns, translated labels; generates style and TYP |
+| `gui.py` | Configuration window: zones picked on a map, options, download and build with their log |
+| `zones.py`, `zones.json` | Simplified outlines and names of the zones shown in the window (`python zones.py` regenerates them) |
 | `osmwriter.py` | Writes shapely geometries (LV95) to OSM XML (WGS84), including multipolygons with holes |
 | `.env.example` | Template of the local configuration (copy to `.env`) |
 | `requirements.txt` | Python dependencies |
@@ -172,7 +174,18 @@ Edit `.env`:
 | `FRANCE_DEPTS` | French departments whose data is used, comma-separated | `74` |
 | `ITALY_ZONES` | Italian zones whose data is used: provinces by their abbreviation, and `GP` for the Piedmont side of the Gran Paradiso | `AO,VB,VA,CO,SO,BZ,GP` |
 
-### Build
+### Configuration window
+
+```powershell
+python gui.py
+```
+
+Click the cantons, French departments and Italian zones to put in the map (wheel to zoom, drag to move),
+choose the label language and the folders, then **Construire les cartes**: the window runs `download.py`
+and `build.py` and shows their log. The choices are remembered for the next time. The departments and
+zones picked on the map are added to `FRANCE_DEPTS` and `ITALY_ZONES` for that build.
+
+### Command line
 
 ```powershell
 python download.py        # first run: ≈ 5 GB (swissTLM3D) + elevation tiles of the coverage, resumable

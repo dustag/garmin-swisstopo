@@ -7,6 +7,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Configuration window (`python gui.py`, PySide6): the cantons, French departments and Italian zones
+  are picked on a map, with the label language, hill shading and folders; the window runs the download
+  and the build, shows their log and progress, and can cancel them.
+
 ## [0.3.0] - 2026-11-04
 
 ### Added
