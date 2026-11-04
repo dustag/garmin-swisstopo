@@ -9,9 +9,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Standalone application for Windows (folder in a zip) and macOS (app in a dmg), with Python, the
-  libraries, a minimal Java runtime and mkgmap: `packaging/build_app.py`, and a GitHub workflow that
-  builds both and attaches them to each published release.
+- Standalone application for Windows (folder in a zip) and macOS, Apple silicon and Intel (app in a dmg),
+  with Python, the libraries, a minimal Java runtime and mkgmap: `packaging/build_app.py`, and a GitHub
+  workflow that builds the three and attaches them to each published release.
 
 ### Changed
 

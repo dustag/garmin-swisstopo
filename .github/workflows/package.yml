@@ -16,7 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        # macos-latest: Apple silicon; macos-15-intel: Intel, the last x86_64 runner of GitHub
+        os: [windows-latest, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +34,7 @@ jobs:
         run: python packaging/build_app.py
       - uses: actions/upload-artifact@v4
         with:
-          name: swisstopo-garmin-${{ runner.os }}
+          name: swisstopo-garmin-${{ matrix.os }}
           path: |
             dist/*.zip
             dist/*.dmg

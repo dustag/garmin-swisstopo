@@ -157,8 +157,8 @@ macOS that holds everything it needs (Python, the libraries, Java and mkgmap): n
 - **Windows**: unzip `swisstopo-garmin-<version>-windows-x64.zip` anywhere and start
   `swisstopo-garmin\swisstopo-garmin.exe`. The application is not signed: on the first start, Windows
   SmartScreen may show a warning, click **More info** then **Run anyway**.
-- **macOS** (Apple silicon): open `swisstopo-garmin-<version>-macos-arm64.dmg` and drag the application to
-  **Applications**. It is not signed by Apple: on the first start, macOS refuses to open it; go to
+- **macOS**: open `swisstopo-garmin-<version>-macos-arm64.dmg` (Apple silicon: M1 and later) or
+  `swisstopo-garmin-<version>-macos-x64.dmg` (Intel) and drag the application to **Applications**. It is not signed by Apple: on the first start, macOS refuses to open it; go to
   **System Settings > Privacy & Security** and click **Open Anyway**.
 
 The data is downloaded to `swisstopo-data` in the home folder (about 20 GB for all of Switzerland), the
@@ -303,7 +303,8 @@ PyInstaller and writes the archive of the current platform to `dist/`, with the 
 Intermediate files go to the temporary folder (`APP_BUILD_DIR` to change it), out of synced folders.
 
 PyInstaller only builds for the platform it runs on. The GitHub workflow `.github/workflows/package.yml`
-builds Windows and macOS when a release is published, and attaches both archives to it; it can also be run
+builds Windows, macOS for Apple silicon and macOS for Intel when a release is published, and attaches the
+three archives to it; it can also be run
 by hand from the Actions tab.
 
 ---
