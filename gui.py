@@ -33,9 +33,10 @@ import zones
 REPO_DIR = Path(__file__).resolve().parent
 COUNTRY_COLORS = {"ch": QColor("#d52b1e"), "fr": QColor("#2f5fb3"), "it": QColor("#2e8b57")}
 LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "rm": "Rumantsch", "en": "English"}
-# Average size of a 10 km tile, base and winter overlay with hill shading, measured on the
-# Switzerland + Haute-Savoie (1.82 MB) and Switzerland + Haute-Savoie + Italy (1.78 MB) maps
-MB_PER_TILE = 1.8
+# Average size of a 10 km tile per map (base with hill shading), measured on the Switzerland +
+# Haute-Savoie (1.04 + 0.77 MB) and Switzerland + Haute-Savoie + Italy (0.97 + 0.82 MB) maps
+MB_PER_TILE = {"base": 1.0, "hiver": 0.8}
+MAP_NAMES = {"base": "été", "hiver": "hiver"}
 PROGRESS = re.compile(r"\[?(\d+)\s*/\s*(\d+)\]?")
 
 
@@ -239,10 +240,10 @@ def coverage_spec(selected: list[dict]) -> str:
     return "+".join(parts)
 
 
-def estimate_mb(selected: list[dict]) -> float:
-    """Size of the base map and winter overlay together, from the number of grid tiles."""
+def estimate_mb(selected: list[dict], maps: list[str]) -> float:
+    """Size of the chosen maps together, from the number of grid tiles."""
     geom = shapely.union_all([shapely.Polygon(p[0], p[1:]) for z in selected for p in z["polygons"]])
-    return len(coverage.tiles_for(geom)) * MB_PER_TILE
+    return len(coverage.tiles_for(geom)) * sum(MB_PER_TILE[m] for m in maps)
 
 
 def file_size(mb: float) -> str:
@@ -327,11 +328,26 @@ class MainWindow(QMainWindow):
         for code, name in LANGUAGES.items():
             self.lang.addItem(name, code)
         self.lang.setCurrentIndex(list(LANGUAGES).index(s.value("lang", config.LANG)))
+        maps = s.value("maps", list(MAP_NAMES), type=list)
+        self.summer = QCheckBox("Été (carte de base)", checked="base" in maps)
+        self.summer.setToolTip("Carte topographique pour toute l'année")
+        self.winter = QCheckBox("Hiver (surcouche)", checked="hiver" in maps)
+        self.winter.setToolTip("Pentes, itinéraires de ski et de raquettes, zones de tranquillité :\n"
+                               "surcouche transparente à afficher par-dessus la carte de base")
+        map_choice = QHBoxLayout()
+        map_choice.addWidget(self.summer)
+        map_choice.addWidget(self.winter)
+        map_choice.addStretch()
         self.dem = QCheckBox("Ombrage du relief", checked=s.value("dem", True, type=bool))
+        self.summer.toggled.connect(self.dem.setEnabled)   # the hill shading is part of the base map
+        self.dem.setEnabled(self.summer.isChecked())
+        for box in (self.summer, self.winter):
+            box.toggled.connect(self.update_summary)
         self.data_dir = PathEdit(s.value("data_dir", str(config.DATA_DIR)))
         self.output_dir = PathEdit(s.value("output_dir", ""), "dans le dossier des données")
         options = QGroupBox("Options")
         form = QFormLayout(options)
+        form.addRow("Cartes", map_choice)
         form.addRow("Langue des étiquettes", self.lang)
         form.addRow("", self.dem)
         form.addRow("Dossier des données", self.data_dir)
@@ -397,10 +413,14 @@ class MainWindow(QMainWindow):
     def output_path(self) -> Path:
         return Path(self.output_dir.text() or Path(self.data_dir.text()) / "output").expanduser()
 
+    def maps(self) -> list[str]:
+        return [m for m, box in (("base", self.summer), ("hiver", self.winter)) if box.isChecked()]
+
     def save_settings(self):
         s = self.settings
         s.setValue("zones", [f"{z['country']}:{z['code']}" for z in self.map.selected()])
         s.setValue("lang", self.lang.currentData())
+        s.setValue("maps", self.maps())
         s.setValue("dem", self.dem.isChecked())
         s.setValue("data_dir", self.data_dir.text())
         s.setValue("output_dir", self.output_dir.text())
@@ -414,8 +434,13 @@ class MainWindow(QMainWindow):
             self.summary.setText("<i>Aucune zone sélectionnée.</i>")
             return
         area = sum(z["area_km2"] for z in selected)
-        self.summary.setText(f"Surface : <b>{thousands(area)} km²</b><br>"
-                             f"Taille estimée : <b>≈ {file_size(estimate_mb(selected))}</b> (base et hiver)")
+        text = f"Surface : <b>{thousands(area)} km²</b><br>"
+        if maps := self.maps():
+            names = " et ".join(MAP_NAMES[m] for m in maps)
+            text += f"Taille estimée : <b>≈ {file_size(estimate_mb(selected, maps))}</b> ({names})"
+        else:
+            text += "<i>Aucune carte choisie (été ou hiver).</i>"
+        self.summary.setText(text)
 
     # Run
 
@@ -441,6 +466,9 @@ class MainWindow(QMainWindow):
         if not spec:
             QMessageBox.information(self, "Aucune zone", "Choisissez au moins une zone sur la carte.")
             return
+        if not self.maps():
+            QMessageBox.information(self, "Aucune carte", "Choisissez la carte d'été, la surcouche d'hiver ou les deux.")
+            return
         java = self.java.text() or "java"
         if not (shutil.which(java) or Path(java).is_file()):
             QMessageBox.warning(self, "Java introuvable",
@@ -449,7 +477,7 @@ class MainWindow(QMainWindow):
                                 "l'emplacement de java.exe dans les options avancées.")
             return
         self.save_settings()
-        build_args = ["--coverage", spec, "--jobs", str(self.jobs.value())]
+        build_args = ["--coverage", spec, "--jobs", str(self.jobs.value()), "--maps", *self.maps()]
         if not self.dem.isChecked():
             build_args.append("--no-dem")
         if self.force.isChecked():

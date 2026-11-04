@@ -181,7 +181,7 @@ python gui.py
 ```
 
 Click the cantons, French departments and Italian zones to put in the map (wheel to zoom, drag to move),
-choose the label language and the folders, then **Construire les cartes**: the window runs `download.py`
+choose the maps (summer base map, winter overlay or both), the label language and the folders, then **Construire les cartes**: the window runs `download.py`
 and `build.py` and shows their log. The choices are remembered for the next time. The departments and
 zones picked on the map are added to `FRANCE_DEPTS` and `ITALY_ZONES` for that build.
 
@@ -197,6 +197,7 @@ Both scripts take the coverage from `.env` or from `--coverage`. `build.py` has 
 ```powershell
 python build.py --coverage canton:VS     # build another coverage
 python build.py --no-dem                 # no hill shading (smaller map)
+python build.py --maps hiver             # only the winter overlay (base, hiver or both)
 python build.py --step osm               # only build the tiles
 python build.py --step mkgmap            # only compile (after editing legend.py, for example)
 python build.py --force                  # rebuild the tiles even if already built
