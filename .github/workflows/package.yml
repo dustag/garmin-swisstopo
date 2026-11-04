@@ -1,11 +1,16 @@
 # Standalone application for Windows and macOS (packaging/build_app.py).
-# Attached to the GitHub release when one is published; also runs by hand
-# (Actions > Package > Run workflow), with the archives as workflow artifacts.
+# Attached to the GitHub release when one is published. Also runs, with the archives as
+# workflow artifacts, on each push changing the packaging, and by hand (Actions > Package >
+# Run workflow, once this file is on the default branch).
 name: Package
 
 on:
   release:
     types: [published]
+  push:
+    paths:
+      - "packaging/**"
+      - ".github/workflows/package.yml"
   workflow_dispatch:
 
 permissions:
