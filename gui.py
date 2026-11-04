@@ -381,7 +381,9 @@ class MainWindow(QMainWindow):
         form.addRow(self.labels["Dossier des cartes"], self.output_dir)
         form.addRow("", self.show_advanced)
 
-        self.java = PathEdit(s.value("java", config.JAVA), folder=False)
+        # Empty: the default of config.py (bundled runtime of the packaged application, which may move)
+        self.java = PathEdit(s.value("java", ""), folder=False)
+        self.java.edit.setPlaceholderText(config.JAVA)
         self.jobs = QSpinBox(minimum=1, maximum=os.cpu_count() or 1)
         self.jobs.setValue(s.value("jobs", max(1, (os.cpu_count() or 2) - 1), type=int))
         self.force = QCheckBox()
@@ -545,7 +547,8 @@ class MainWindow(QMainWindow):
         if self.output_dir.text():
             env.insert("OUTPUT_DIR", self.output_dir.text())
         env.insert("LANG_LABELS", self.lang.currentData())
-        env.insert("JAVA_EXE", self.java.text() or "java")
+        if self.java.text():
+            env.insert("JAVA_EXE", self.java.text())
         # The neighbours' data must include every selected zone
         selected = self.map.selected()
         depts = dict.fromkeys(config.FRANCE_DEPTS + [z["code"] for z in selected if z["country"] == "fr"])
@@ -563,7 +566,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("Aucune carte"),
                                     tr("Choisissez la carte d'été, la surcouche d'hiver ou les deux."))
             return
-        java = self.java.text() or "java"
+        java = self.java.text() or config.JAVA
         if not (shutil.which(java) or Path(java).is_file()):
             QMessageBox.warning(self, tr("Java introuvable"),
                                 tr("Java est nécessaire pour compiler les cartes (mkgmap).\n\n"
