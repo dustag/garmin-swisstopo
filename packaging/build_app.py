@@ -100,6 +100,20 @@ def size_mb(path: Path) -> float:
     return sum(p.stat().st_size for p in files) / 1e6
 
 
+def smoke_test(bundle: Path):
+    """Run the packaged scripts (all their modules, GDAL included) and mkgmap with the bundled Java."""
+    if sys.platform == "darwin":
+        exe, internal = bundle / "Contents" / "MacOS" / APP, bundle / "Contents" / "Frameworks"
+    else:
+        exe, internal = bundle / f"{APP}.exe", bundle / "_internal"
+    for step in ("download", "build"):
+        subprocess.run([str(exe), step, "--help"], check=True, capture_output=True)
+    jar = next((internal / "tools").glob("mkgmap-latest/mkgmap-*/mkgmap.jar"))
+    out = subprocess.run([str(internal / "jre" / "bin" / f"java{EXE}"), "-jar", str(jar), "--version"],
+                         check=True, capture_output=True, text=True)
+    print(f"Smoke test passed (mkgmap {(out.stdout + out.stderr).strip()})")
+
+
 def main():
     ver = version()
     print(f"{APP} {ver} for {sys.platform} {platform.machine()}")
@@ -115,17 +129,26 @@ def main():
     # The runtime and mkgmap go next to the Python modules, where config.py looks for them
     if sys.platform == "darwin":
         bundle = BUNDLES / f"{APP}.app"
-        internal = bundle / "Contents" / "Frameworks"
+        # Contents/Frameworks may only hold code for codesign: like PyInstaller does for its
+        # data, the folders go to Contents/Resources, with a link from Frameworks
+        for name, src in (("jre", jre), ("tools", WORK / "tools")):
+            shutil.copytree(src, bundle / "Contents" / "Resources" / name, symlinks=True)
+            (bundle / "Contents" / "Frameworks" / name).symlink_to(Path("..") / "Resources" / name)
+        # Every binary must be signed to run on Apple silicon: ad-hoc signature of the
+        # runtime's binaries, then of the whole bundle
+        runtime = bundle / "Contents" / "Resources" / "jre"
+        binaries = [*(runtime / "bin").iterdir(), *(runtime / "lib").rglob("*.dylib"), runtime / "lib" / "jspawnhelper"]
+        subprocess.run(["codesign", "--force", "--sign", "-", *[str(b) for b in binaries if b.is_file()]], check=True)
+        subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(bundle)], check=True)
     else:
         bundle = BUNDLES / APP
-        internal = bundle / "_internal"
-    shutil.copytree(jre, internal / "jre", dirs_exist_ok=True)
-    shutil.copytree(WORK / "tools", internal / "tools", dirs_exist_ok=True)
+        shutil.copytree(jre, bundle / "_internal" / "jre", dirs_exist_ok=True)
+        shutil.copytree(WORK / "tools", bundle / "_internal" / "tools", dirs_exist_ok=True)
+
+    smoke_test(bundle)
 
     DIST.mkdir(exist_ok=True)
     if sys.platform == "darwin":
-        # Ad-hoc signature of the whole bundle, needed on Apple silicon after adding the runtime
-        subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(bundle)], check=True)
         arch = "arm64" if platform.machine() == "arm64" else "x64"
         staging = WORK / "dmg"
         remove(staging)
