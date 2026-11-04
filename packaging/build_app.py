@@ -107,7 +107,9 @@ def smoke_test(bundle: Path):
     else:
         exe, internal = bundle / f"{APP}.exe", bundle / "_internal"
     for step in ("download", "build"):
-        subprocess.run([str(exe), step, "--help"], check=True, capture_output=True)
+        run = subprocess.run([str(exe), step, "--help"], capture_output=True, text=True)
+        if run.returncode:
+            raise SystemExit(f"Smoke test failed: {step} --help exited with {run.returncode}\n{run.stdout}{run.stderr}")
     jar = next((internal / "tools").glob("mkgmap-latest/mkgmap-*/mkgmap.jar"))
     out = subprocess.run([str(internal / "jre" / "bin" / f"java{EXE}"), "-jar", str(jar), "--version"],
                          check=True, capture_output=True, text=True)
