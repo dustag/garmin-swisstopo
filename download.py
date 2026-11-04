@@ -9,6 +9,8 @@ originals deleted: all of Switzerland takes ~40 GB at 2 m, a few GB at 5 m.
 import argparse
 import json
 import sys
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -112,7 +114,14 @@ def get_alti(key, href):
     if dest.exists():
         return
     legacy = next(LEGACY_2M_DIR.glob(f"swissalti3d_*_{key}_2_2056_5728.tif"), None) if LEGACY_2M_DIR.exists() else None
-    src = legacy or fetch(href, config.DOWNLOAD_DIR / "alti3d_tmp" / Path(href).name, quiet=True)
+    for attempt in range(4):   # thousands of small files: retry transient network errors
+        try:
+            src = legacy or fetch(href, config.DOWNLOAD_DIR / "alti3d_tmp" / Path(href).name, quiet=True)
+            break
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == 3:
+                raise
+            time.sleep(10 * (attempt + 1))
     to_5m(src, dest)
     src.unlink()
 

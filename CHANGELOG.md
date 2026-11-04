@@ -26,6 +26,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Large coverages failed on Windows: mkgmap options are now passed through a config file instead of the
   command line, and tile descriptions are cut to the 50 characters Garmin allows.
+- swissALTI3D downloads retry on transient network errors instead of stopping the whole download.
 
 ## [0.1.0] - 2026-11-03
 
