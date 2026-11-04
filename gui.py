@@ -37,6 +37,7 @@ import zones
 from i18n import tr
 
 REPO_DIR = Path(__file__).resolve().parent
+REPO_URL = "https://github.com/dustag/garmin-swisstopo"
 COUNTRY_COLORS = {"ch": QColor("#d52b1e"), "fr": QColor("#2f5fb3"), "it": QColor("#2e8b57")}
 LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "en": "English"}
 # Average size of a 10 km tile per map (base with hill shading), measured on the Switzerland +
@@ -415,6 +416,14 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         self.setCentralWidget(splitter)
+        credits = QLabel(f'© 2026 Antoine Gardiol · <a href="{REPO_URL}">{REPO_URL.removeprefix("https://")}</a>',
+                         openExternalLinks=True)
+        font = credits.font()
+        font.setPointSizeF(font.pointSizeF() * 0.85)
+        credits.setFont(font)
+        credits.setContentsMargins(0, 0, 8, 2)
+        self.statusBar().addPermanentWidget(credits)
+        self.statusBar().setSizeGripEnabled(False)
         self.resize(1300, 800)
         if s.contains("geometry"):
             self.restoreGeometry(s.value("geometry"))
