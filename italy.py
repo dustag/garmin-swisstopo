@@ -309,7 +309,7 @@ TRAIL_KEYS = {"path", "track", "hike_t1", "hike_t2", "hike_t3"}
 def label(row):
     """Name in the label language when the local name is bilingual (South Tyrol, Aosta Valley)."""
     name = row.name if isinstance(row.name, str) else None
-    local = getattr(row, f"name_{config.DATA_LANG}", None)
+    local = getattr(row, f"name_{config.LANG}", None)
     if name and isinstance(local, str) and (" - " in name or " / " in name):
         return local
     return name

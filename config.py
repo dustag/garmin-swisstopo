@@ -59,12 +59,10 @@ ITALY_FAMILY_ID = 6800
 COMBINED_FAMILY_ID = 7000
 FAMILY_NAME = "Swisstopo"
 
-# Label language: fr, de, it, rm (Romansh) or en. Place names always stay in
-# their official local form; source attributes without Romansh fall back to German.
+# Label language: fr, de, it or en. Place names always stay in their official local form.
 LANG = os.environ.get("LANG_LABELS", "fr").lower()
-if LANG not in ("fr", "de", "it", "rm", "en"):
-    raise ValueError(f"LANG_LABELS must be fr, de, it, rm or en (got {LANG!r})")
-DATA_LANG = "de" if LANG == "rm" else LANG
+if LANG not in ("fr", "de", "it", "en"):
+    raise ValueError(f"LANG_LABELS must be fr, de, it or en (got {LANG!r})")
 
 # French departments whose data is used. Switzerland always has priority: French
 # data only fills the parts of a tile outside Switzerland.

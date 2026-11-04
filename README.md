@@ -102,7 +102,7 @@ flowchart LR
    - An opaque background, called `land`, covers Switzerland only. On the device, the map therefore
      hides Garmin's own maps (TopoActive) in Switzerland, but lets them show through abroad.
 4. **`legend.py`** is the single source of truth for the look of the maps. For every category it holds
-   the Garmin type, the zoom level, the colours or bitmap pattern, and the legend labels in FR/DE/IT/RM/EN.
+   the Garmin type, the zoom level, the colours or bitmap pattern, and the legend labels in FR/DE/IT/EN.
    From it, the build writes the **mkgmap style** (which `k=` goes to which Garmin type) and the **TYP
    file** (how the device draws each type).
 5. **mkgmap** compiles each grid tile into a Garmin tile. All tiles of a coverage are bundled into one `.img`
@@ -121,7 +121,8 @@ flowchart LR
 | `build.py` | Pipeline: per-tile terrain model, contours, slopes, base data, winter data, hill shading, mkgmap call |
 | `legend.py` | Map legend: Garmin types, zoom levels, colours/patterns, translated labels; generates style and TYP |
 | `gui.py` | Configuration window: zones picked on a map, options, download and build with their log |
-| `zones.py`, `zones.json` | Simplified outlines and names of the zones shown in the window (`python zones.py` regenerates them) |
+| `i18n.py` | Translations of the window (texts are written in French in `gui.py`) |
+| `zones.py`, `zones.json` | Names and simplified outlines of the zones shown in the window (`python zones.py` regenerates the outlines) |
 | `osmwriter.py` | Writes shapely geometries (LV95) to OSM XML (WGS84), including multipolygons with holes |
 | `.env.example` | Template of the local configuration (copy to `.env`) |
 | `requirements.txt` | Python dependencies |
@@ -170,7 +171,7 @@ Edit `.env`:
 | `JAVA_EXE` | Java executable, if `java` is not in the PATH | `java` |
 | `JAVA_MAX_HEAP` | Memory for mkgmap | `4g` |
 | `COVERAGE` | Default coverage (see below) | `telliers` |
-| `LANG_LABELS` | Language of the labels: `fr`, `de`, `it`, `rm` or `en` | `fr` |
+| `LANG_LABELS` | Language of the labels: `fr`, `de`, `it` or `en` | `fr` |
 | `FRANCE_DEPTS` | French departments whose data is used, comma-separated | `74` |
 | `ITALY_ZONES` | Italian zones whose data is used: provinces by their abbreviation, and `GP` for the Piedmont side of the Gran Paradiso | `AO,VB,VA,CO,SO,BZ,GP` |
 
@@ -182,7 +183,8 @@ python gui.py
 
 Click the cantons, French departments and Italian zones to put in the map (wheel to zoom, drag to move),
 choose the maps (summer base map, winter overlay or both), the label language and the folders, then **Construire les cartes**: the window runs `download.py`
-and `build.py` and shows their log. The choices are remembered for the next time. The departments and
+and `build.py` and shows their log. The window is in the language chosen for the labels (French, German, Italian or
+English), and the choices are remembered for the next time. The departments and
 zones picked on the map are added to `FRANCE_DEPTS` and `ITALY_ZONES` for that build.
 
 ### Command line
@@ -262,10 +264,8 @@ instead, such as `canton:VS+dept:74`.
 ### Labels and languages
 
 - **Legend** (category names shown by the device): the TYP file contains French, German, Italian and
-  English, and the watch picks the one matching its language. `LANG_LABELS` sets the fallback string,
-  which is the only place Romansh can be used.
+  English, and the watch picks the one matching its language. `LANG_LABELS` sets the fallback string.
 - **Data labels** (SAC grade of routes, type of allowed route in a wildlife zone) follow `LANG_LABELS`.
-  The sources have no Romansh version, so `rm` falls back to German.
 - **Place names** always keep their official local form from swissTLM3D. In Italy, bilingual names of
   OpenStreetMap (South Tyrol, Aosta Valley) are replaced by the name in the label language when there is one.
 
@@ -393,4 +393,3 @@ OpenStreetMap or Camptocamp.
   difference, a few decimetres, is not corrected.
 - Hill shading and the half-transparent slope patterns depend on the device firmware; they still have to
   be validated on the fēnix 7X Pro.
-- The Romansh legend labels are a first draft and need proofreading by a native speaker.

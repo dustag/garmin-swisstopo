@@ -332,7 +332,7 @@ def write_ski(ctx: TileContext, osm: OsmWriter, dem: Dem):
             key = "ski"
         osm.add(g, {"k": key})
 
-    diff_col = f"difficulty_{config.DATA_LANG}"
+    diff_col = f"difficulty_{config.LANG}"
     df = ctx.read("ski_routes_2056", ["route_nr", "target_name", diff_col], path=next(SKI.glob("ski_routes*.gpkg")))
     for g, nr, target, diff in zip(df.geometry, df.route_nr, df.target_name, df[diff_col]):
         if isinstance(nr, str):
@@ -372,7 +372,7 @@ def fetch_wildlife(bbox):
 
 def write_wildlife(ctx: TileContext, osm: OsmWriter):
     # The API provides de/fr/it attributes only
-    lang = config.DATA_LANG if config.DATA_LANG in ("de", "fr", "it") else "de"
+    lang = config.LANG if config.LANG in ("de", "fr", "it") else "de"
     for layer, f in fetch_wildlife(ctx.bounds):
         p = f["properties"]
         geom = ctx.clip(shapely.geometry.shape(f["geometry"]))

@@ -5,6 +5,9 @@
 Downloads and builds run download.py and build.py in a child process whose output
 is shown in the window. Packaged (frozen) builds run the same executable with a
 "download" or "build" argument instead of the scripts.
+
+The window follows the language chosen for the map labels (French by default);
+its texts are translated in i18n.py.
 """
 import importlib
 import math
@@ -16,7 +19,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QProcess, QProcessEnvironment, QRectF, QSettings, Qt, QUrl, Signal
+from PySide6.QtCore import (QLibraryInfo, QPointF, QProcess, QProcessEnvironment, QRectF, QSettings, Qt,
+                            QTranslator, QUrl, Signal)
 from PySide6.QtGui import (QBrush, QColor, QDesktopServices, QFont, QFontDatabase, QFontMetricsF, QPainter,
                            QPainterPath, QPainterPathStroker, QPen, QPolygonF)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGraphicsItem,
@@ -28,11 +32,13 @@ import shapely
 
 import config
 import coverage
+import i18n
 import zones
+from i18n import tr
 
 REPO_DIR = Path(__file__).resolve().parent
 COUNTRY_COLORS = {"ch": QColor("#d52b1e"), "fr": QColor("#2f5fb3"), "it": QColor("#2e8b57")}
-LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "rm": "Rumantsch", "en": "English"}
+LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "en": "English"}
 # Average size of a 10 km tile per map (base with hill shading), measured on the Switzerland +
 # Haute-Savoie (1.04 + 0.77 MB) and Switzerland + Haute-Savoie + Italy (0.97 + 0.82 MB) maps
 MB_PER_TILE = {"base": 1.0, "hiver": 0.8}
@@ -62,7 +68,6 @@ class ZoneItem(QGraphicsPathItem):
         self.hovered = False
         self.setAcceptHoverEvents(True)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip(f"{zone['name']} ({thousands(zone['area_km2'])} km²)")
         self.update_style()
 
     def update_style(self):
@@ -96,7 +101,7 @@ class LabelItem(QGraphicsItem):
         self.font.setPointSizeF(self.FONT_SIZE)
         self.font.setBold(True)
         self.metrics = QFontMetricsF(self.font)
-        self.text = zone["name"]
+        self.text = zone["code"]
         self.setPos(zone["label"][0], -zone["label"][1])
         self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
         self.setAcceptedMouseButtons(Qt.NoButton)
@@ -154,6 +159,13 @@ class MapView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._press = None
         self._fitted = False
+        self.set_language(i18n.language)
+
+    def set_language(self, lang: str):
+        for item in self.items_by_key.values():
+            item.zone["name"] = zones.name(item.zone, lang)
+            item.setToolTip(f"{item.zone['name']} ({thousands(item.zone['area_km2'])} km²)")
+        self.fit_labels()
 
     # Selection
 
@@ -247,10 +259,10 @@ def estimate_mb(selected: list[dict], maps: list[str]) -> float:
 
 
 def file_size(mb: float) -> str:
-    """Size in MB or GB (SI), with one decimal below 10, French decimal comma."""
-    value, unit = (mb / 1000, "Go") if mb >= 1000 else (mb, "Mo")
+    """Size in MB or GB (SI), with one decimal below 10."""
+    value, unit = (mb / 1000, tr("Go")) if mb >= 1000 else (mb, tr("Mo"))
     digits = max(0, 1 - math.floor(math.log10(max(value, 1))))
-    return f"{round(value, digits):.{digits}f} {unit}".replace(".", ",")
+    return i18n.decimal(f"{round(value, digits):.{digits}f}") + f" {unit}"
 
 
 def child_command(step: str, args: list[str]) -> tuple[str, list[str]]:
@@ -268,10 +280,9 @@ def last_segment(line: str) -> str:
 class PathEdit(QWidget):
     """Line edit with a browse button, for a folder or a file."""
 
-    def __init__(self, text="", placeholder="", folder=True):
+    def __init__(self, text="", folder=True):
         super().__init__()
         self.edit = QLineEdit(text)
-        self.edit.setPlaceholderText(placeholder)
         browse = QToolButton(text="…")
         browse.clicked.connect(self.browse)
         self.folder = folder
@@ -285,9 +296,9 @@ class PathEdit(QWidget):
 
     def browse(self):
         if self.folder:
-            path = QFileDialog.getExistingDirectory(self, "Choisir un dossier", self.text())
+            path = QFileDialog.getExistingDirectory(self, tr("Choisir un dossier"), self.text())
         else:
-            path, _ = QFileDialog.getOpenFileName(self, "Choisir un fichier", self.text())
+            path, _ = QFileDialog.getOpenFileName(self, tr("Choisir un fichier"), self.text())
         if path:
             self.edit.setText(str(Path(path)))
 
@@ -295,90 +306,93 @@ class PathEdit(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Cartes Garmin swisstopo")
         self.settings = QSettings("swisstopo-garmin", "gui")
+        s = self.settings
+        lang = s.value("lang", config.LANG)
+        i18n.language = lang if lang in LANGUAGES else "fr"
+        self.qt_translator = QTranslator(self)
         self.process = None
         self.steps = []
         self._partial = ""
+        self._status = ("Prêt.", {}, True)
 
         self.map = MapView(zones.load())
         self.map.selection_changed.connect(self.update_summary)
 
         # Zones
+        self.help = QLabel(wordWrap=True)
         self.summary = QLabel(wordWrap=True)
-        whole = QPushButton("Toute la Suisse")
-        whole.clicked.connect(lambda: self.map.set_selected({("ch", c) for c in config.CANTONS}))
-        clear = QPushButton("Tout désélectionner")
-        clear.clicked.connect(lambda: self.map.set_selected(set(), exclusive=True))
-        home = QPushButton("Recentrer")
-        home.clicked.connect(self.map.fit_home)
+        self.whole = QPushButton()
+        self.whole.clicked.connect(lambda: self.map.set_selected({("ch", c) for c in config.CANTONS}))
+        self.clear = QPushButton()
+        self.clear.clicked.connect(lambda: self.map.set_selected(set(), exclusive=True))
+        self.home = QPushButton()
+        self.home.clicked.connect(self.map.fit_home)
         buttons = QHBoxLayout()
-        for b in (whole, clear, home):
+        for b in (self.whole, self.clear, self.home):
             buttons.addWidget(b)
-        zone_box = QGroupBox("Zones")
-        zone_layout = QVBoxLayout(zone_box)
-        zone_layout.addWidget(QLabel("Cliquez sur la carte pour choisir les zones. "
-                                     "Molette pour zoomer, glisser pour se déplacer.", wordWrap=True))
+        self.zone_box = QGroupBox()
+        zone_layout = QVBoxLayout(self.zone_box)
+        zone_layout.addWidget(self.help)
         zone_layout.addWidget(self.summary)
         zone_layout.addLayout(buttons)
 
         # Options
-        s = self.settings
         self.lang = QComboBox()
         for code, name in LANGUAGES.items():
             self.lang.addItem(name, code)
-        self.lang.setCurrentIndex(list(LANGUAGES).index(s.value("lang", config.LANG)))
+        self.lang.setCurrentIndex(list(LANGUAGES).index(i18n.language))
+        self.lang.currentIndexChanged.connect(self.change_language)
         maps = s.value("maps", list(MAP_NAMES), type=list)
-        self.summer = QCheckBox("Été (carte de base)", checked="base" in maps)
-        self.summer.setToolTip("Carte topographique pour toute l'année")
-        self.winter = QCheckBox("Hiver (surcouche)", checked="hiver" in maps)
-        self.winter.setToolTip("Pentes, itinéraires de ski et de raquettes, zones de tranquillité :\n"
-                               "surcouche transparente à afficher par-dessus la carte de base")
+        self.summer = QCheckBox(checked="base" in maps)
+        self.winter = QCheckBox(checked="hiver" in maps)
         map_choice = QHBoxLayout()
         map_choice.addWidget(self.summer)
         map_choice.addWidget(self.winter)
         map_choice.addStretch()
-        self.dem = QCheckBox("Ombrage du relief", checked=s.value("dem", True, type=bool))
+        self.dem = QCheckBox(checked=s.value("dem", True, type=bool))
         self.summer.toggled.connect(self.dem.setEnabled)   # the hill shading is part of the base map
         self.dem.setEnabled(self.summer.isChecked())
         for box in (self.summer, self.winter):
             box.toggled.connect(self.update_summary)
         self.data_dir = PathEdit(s.value("data_dir", str(config.DATA_DIR)))
-        self.output_dir = PathEdit(s.value("output_dir", ""), "dans le dossier des données")
-        options = QGroupBox("Options")
-        form = QFormLayout(options)
-        form.addRow("Cartes", map_choice)
-        form.addRow("Langue des étiquettes", self.lang)
+        self.output_dir = PathEdit(s.value("output_dir", ""))
+        self.show_advanced = QCheckBox()
+        self.labels = {key: QLabel() for key in ("Cartes", "Langue", "Dossier des données", "Dossier des cartes",
+                                                 "Tuiles en parallèle")}
+        self.options = QGroupBox()
+        form = QFormLayout(self.options)
+        form.addRow(self.labels["Cartes"], map_choice)
+        form.addRow(self.labels["Langue"], self.lang)
         form.addRow("", self.dem)
-        form.addRow("Dossier des données", self.data_dir)
-        form.addRow("Dossier des cartes", self.output_dir)
+        form.addRow(self.labels["Dossier des données"], self.data_dir)
+        form.addRow(self.labels["Dossier des cartes"], self.output_dir)
+        form.addRow("", self.show_advanced)
 
         self.java = PathEdit(s.value("java", config.JAVA), folder=False)
         self.jobs = QSpinBox(minimum=1, maximum=os.cpu_count() or 1)
         self.jobs.setValue(s.value("jobs", max(1, (os.cpu_count() or 2) - 1), type=int))
-        self.force = QCheckBox("Reconstruire les tuiles déjà construites")
-        advanced = QGroupBox("Avancé", visible=False)
-        adv_form = QFormLayout(advanced)
+        self.force = QCheckBox()
+        self.advanced = QGroupBox(visible=False)
+        adv_form = QFormLayout(self.advanced)
         adv_form.addRow("Java", self.java)
-        adv_form.addRow("Tuiles en parallèle", self.jobs)
+        adv_form.addRow(self.labels["Tuiles en parallèle"], self.jobs)
         adv_form.addRow("", self.force)
-        show_advanced = QCheckBox("Afficher les options avancées")
-        show_advanced.toggled.connect(advanced.setVisible)
-        form.addRow("", show_advanced)
+        self.show_advanced.toggled.connect(self.advanced.setVisible)
 
         # Run
-        self.start_button = QPushButton("Construire les cartes")
+        self.start_button = QPushButton()
         self.start_button.setDefault(True)
         self.start_button.clicked.connect(self.start)
-        self.cancel_button = QPushButton("Annuler", enabled=False)
+        self.cancel_button = QPushButton(enabled=False)
         self.cancel_button.clicked.connect(self.cancel)
-        open_button = QPushButton("Ouvrir le dossier des cartes")
-        open_button.clicked.connect(self.open_output)
+        self.open_button = QPushButton()
+        self.open_button.clicked.connect(self.open_output)
         run_buttons = QHBoxLayout()
         run_buttons.addWidget(self.start_button)
         run_buttons.addWidget(self.cancel_button)
-        run_buttons.addWidget(open_button)
-        self.status = QLabel("Prêt.")
+        run_buttons.addWidget(self.open_button)
+        self.status = QLabel()
         self.progress = QProgressBar(textVisible=False)
         self.progress.setRange(0, 1)
         self.log = QPlainTextEdit(readOnly=True)
@@ -387,9 +401,9 @@ class MainWindow(QMainWindow):
 
         side = QWidget()
         side_layout = QVBoxLayout(side)
-        side_layout.addWidget(zone_box)
-        side_layout.addWidget(options)
-        side_layout.addWidget(advanced)
+        side_layout.addWidget(self.zone_box)
+        side_layout.addWidget(self.options)
+        side_layout.addWidget(self.advanced)
         side_layout.addLayout(run_buttons)
         side_layout.addWidget(self.status)
         side_layout.addWidget(self.progress)
@@ -405,8 +419,55 @@ class MainWindow(QMainWindow):
         if s.contains("geometry"):
             self.restoreGeometry(s.value("geometry"))
 
+        self.retranslate()
         keys = {tuple(k.split(":")) for k in s.value("zones", [], type=list)}
         self.map.set_selected(keys & set(self.map.items_by_key))
+
+    # Language
+
+    def change_language(self):
+        i18n.language = self.lang.currentData()
+        self.map.set_language(i18n.language)
+        self.retranslate()
+
+    def retranslate(self):
+        # Standard buttons of the message boxes (Yes, No...)
+        QApplication.removeTranslator(self.qt_translator)
+        if self.qt_translator.load(f"qtbase_{i18n.language}", QLibraryInfo.path(QLibraryInfo.TranslationsPath)):
+            QApplication.installTranslator(self.qt_translator)
+
+        self.setWindowTitle(tr("Cartes Garmin swisstopo"))
+        self.zone_box.setTitle(tr("Zones"))
+        self.help.setText(tr("Cliquez sur la carte pour choisir les zones. "
+                             "Molette pour zoomer, glisser pour se déplacer."))
+        self.whole.setText(tr("Toute la Suisse"))
+        self.clear.setText(tr("Tout désélectionner"))
+        self.home.setText(tr("Recentrer"))
+        self.options.setTitle(tr("Options"))
+        for key, label in self.labels.items():
+            label.setText(tr(key))
+        self.summer.setText(tr("Été (carte de base)"))
+        self.summer.setToolTip(tr("Carte topographique pour toute l'année"))
+        self.winter.setText(tr("Hiver (surcouche)"))
+        self.winter.setToolTip(tr("Pentes, itinéraires de ski et de raquettes, zones de tranquillité :\n"
+                                  "surcouche transparente à afficher par-dessus la carte de base"))
+        self.lang.setToolTip(tr("Langue de la fenêtre et des étiquettes de la carte"))
+        self.dem.setText(tr("Ombrage du relief"))
+        self.output_dir.edit.setPlaceholderText(tr("dans le dossier des données"))
+        self.show_advanced.setText(tr("Afficher les options avancées"))
+        self.advanced.setTitle(tr("Avancé"))
+        self.force.setText(tr("Reconstruire les tuiles déjà construites"))
+        self.start_button.setText(tr("Construire les cartes"))
+        self.cancel_button.setText(tr("Annuler"))
+        self.open_button.setText(tr("Ouvrir le dossier des cartes"))
+        self.set_status(*self._status)
+        self.update_summary()
+
+    def set_status(self, text, values, ok=True):
+        """Status line, kept untranslated so that it follows a change of language."""
+        self._status = (text, values, ok)
+        self.status.setText(tr(text, **values))
+        self.status.setStyleSheet("" if ok else "color: #c0392b; font-weight: bold;")
 
     # Settings
 
@@ -431,15 +492,16 @@ class MainWindow(QMainWindow):
     def update_summary(self):
         selected = self.map.selected()
         if not selected:
-            self.summary.setText("<i>Aucune zone sélectionnée.</i>")
+            self.summary.setText(f"<i>{tr('Aucune zone sélectionnée.')}</i>")
             return
         area = sum(z["area_km2"] for z in selected)
-        text = f"Surface : <b>{thousands(area)} km²</b><br>"
+        text = tr("Surface : <b>{area} km²</b>", area=thousands(area)) + "<br>"
         if maps := self.maps():
-            names = " et ".join(MAP_NAMES[m] for m in maps)
-            text += f"Taille estimée : <b>≈ {file_size(estimate_mb(selected, maps))}</b> ({names})"
+            names = tr(" et ").join(tr(MAP_NAMES[m]) for m in maps)
+            text += tr("Taille estimée : <b>≈ {size}</b> ({maps})",
+                       size=file_size(estimate_mb(selected, maps)), maps=names)
         else:
-            text += "<i>Aucune carte choisie (été ou hiver).</i>"
+            text += f"<i>{tr('Aucune carte choisie (été ou hiver).')}</i>"
         self.summary.setText(text)
 
     # Run
@@ -464,17 +526,18 @@ class MainWindow(QMainWindow):
     def start(self):
         spec = coverage_spec(self.map.selected())
         if not spec:
-            QMessageBox.information(self, "Aucune zone", "Choisissez au moins une zone sur la carte.")
+            QMessageBox.information(self, tr("Aucune zone"), tr("Choisissez au moins une zone sur la carte."))
             return
         if not self.maps():
-            QMessageBox.information(self, "Aucune carte", "Choisissez la carte d'été, la surcouche d'hiver ou les deux.")
+            QMessageBox.information(self, tr("Aucune carte"),
+                                    tr("Choisissez la carte d'été, la surcouche d'hiver ou les deux."))
             return
         java = self.java.text() or "java"
         if not (shutil.which(java) or Path(java).is_file()):
-            QMessageBox.warning(self, "Java introuvable",
-                                "Java est nécessaire pour compiler les cartes (mkgmap).\n\n"
-                                "Installez Java (par exemple Eclipse Temurin) ou indiquez "
-                                "l'emplacement de java.exe dans les options avancées.")
+            QMessageBox.warning(self, tr("Java introuvable"),
+                                tr("Java est nécessaire pour compiler les cartes (mkgmap).\n\n"
+                                   "Installez Java (par exemple Eclipse Temurin) ou indiquez "
+                                   "l'emplacement de java.exe dans les options avancées."))
             return
         self.save_settings()
         build_args = ["--coverage", spec, "--jobs", str(self.jobs.value()), "--maps", *self.maps()]
@@ -482,18 +545,17 @@ class MainWindow(QMainWindow):
             build_args.append("--no-dem")
         if self.force.isChecked():
             build_args.append("--force")
-        self.steps = [("Téléchargement des données", "download", ["--coverage", spec]),
-                      ("Construction des cartes", "build", build_args)]
+        self.steps = [("Téléchargement des données…", "download", ["--coverage", spec]),
+                      ("Construction des cartes…", "build", build_args)]
         self.log.clear()
-        self.append_log(f"Couverture : {spec}")
+        self.append_log(tr("Couverture : {spec}", spec=spec))
         self.start_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.next_step()
 
     def next_step(self):
         title, step, args = self.steps.pop(0)
-        self.status.setText(title + "…")
-        self.status.setStyleSheet("")
+        self.set_status(title, {})
         self.progress.setRange(0, 0)
         self._partial = ""
         self.process = QProcess(self)
@@ -531,20 +593,19 @@ class MainWindow(QMainWindow):
         if status == QProcess.NormalExit and code == 0 and self.steps:
             self.next_step()
         elif status == QProcess.NormalExit and code == 0:
-            self.done(f"Cartes prêtes dans {self.output_path()}", ok=True)
+            self.done("Cartes prêtes dans {path}", {"path": self.output_path()}, ok=True)
         elif self.steps is None:
-            self.done("Annulé.", ok=False)
+            self.done("Annulé.", {}, ok=False)
         else:
-            self.done(f"Échec (code {code}), voir le journal.", ok=False)
+            self.done("Échec (code {code}), voir le journal.", {"code": code}, ok=False)
 
     def process_error(self, error):
         if error == QProcess.FailedToStart:
             self.process = None
-            self.done("Impossible de lancer le programme.", ok=False)
+            self.done("Impossible de lancer le programme.", {}, ok=False)
 
-    def done(self, message, ok):
-        self.status.setText(message)
-        self.status.setStyleSheet("" if ok else "color: #c0392b; font-weight: bold;")
+    def done(self, message, values, ok):
+        self.set_status(message, values, ok)
         self.progress.setRange(0, 1)
         self.progress.setValue(1 if ok else 0)
         self.start_button.setEnabled(True)
@@ -567,8 +628,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         if self.process is not None:
-            answer = QMessageBox.question(self, "Construction en cours",
-                                          "Une construction est en cours. L'arrêter et quitter ?")
+            answer = QMessageBox.question(self, tr("Construction en cours"),
+                                          tr("Une construction est en cours. L'arrêter et quitter ?"))
             if answer != QMessageBox.Yes:
                 event.ignore()
                 return
@@ -585,7 +646,6 @@ def main():
         sys.argv = [f"{sys.argv[1]}.py"] + sys.argv[2:]
         sys.exit(module.main())
     app = QApplication(sys.argv)
-    app.setApplicationDisplayName("Cartes Garmin swisstopo")
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
