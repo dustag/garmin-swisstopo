@@ -21,8 +21,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-latest: Apple silicon; macos-15-intel: Intel, the last x86_64 runner of GitHub
-        os: [windows-latest, macos-latest, macos-15-intel]
+        # macos-14: Apple silicon (macos-latest jobs were not getting a runner);
+        # macos-15-intel: Intel, the last x86_64 runner of GitHub
+        os: [windows-latest, macos-14, macos-15-intel]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
