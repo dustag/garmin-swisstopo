@@ -16,6 +16,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import urllib.parse
 import urllib.request
 import zipfile
@@ -491,6 +492,10 @@ LEVELS = "0:24, 1:23, 2:21, 3:19, 4:17"
 DEM_DISTS = "3312,6624,13248,26512,53024"   # one per level
 # Above Garmin's own maps (mkgmap default 25), winter overlay on top
 DRAW_PRIORITY = {"base": 40, "hiver": 41}
+# Started by the window, without a console (Windows): no console window for Java, its output
+# goes to the window's log with ours
+NO_CONSOLE = ({"creationflags": subprocess.CREATE_NO_WINDOW, "stdout": sys.stdout, "stderr": subprocess.STDOUT}
+              if os.name == "nt" and not (sys.stdout and sys.stdout.isatty()) else {})
 
 
 def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
@@ -535,7 +540,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
     args_file = work / f"{layer_key}.mkgmap.args"
     args_file.write_text("\n".join(opts) + "\n", encoding="utf-8")
     subprocess.run([config.JAVA, f"-Xmx{config.JAVA_MAX_HEAP}", "-jar", str(MKGMAP), "-c", str(args_file)],
-                   check=True)
+                   check=True, **NO_CONSOLE)
     dest = config.OUTPUT_DIR / f"swisstopo_{cov.name}_{layer_key}.img"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(out / "gmapsupp.img", dest)

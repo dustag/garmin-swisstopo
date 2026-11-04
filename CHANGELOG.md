@@ -12,6 +12,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The bundled Java runtime is used when `JAVA_EXE` is not set; the window keeps the Java field empty by
   default.
 - `download.py` no longer downloads mkgmap when it is already there.
+- Java runs without a console window when the build is started from the window on Windows.
 
 ## [0.4.0] - 2026-11-04
 

@@ -651,7 +651,8 @@ class MainWindow(QMainWindow):
         self.steps = None
         pid = self.process.processId()
         if os.name == "nt":   # the build starts worker processes and Java: stop the whole tree
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
         else:
             self.process.kill()
 
