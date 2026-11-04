@@ -7,3 +7,4 @@ geopandas
 shapely>=2
 pyproj
 python-dotenv
+py7zr

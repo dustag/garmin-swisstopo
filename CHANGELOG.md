@@ -7,6 +7,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- French departments (`FRANCE_DEPTS`, tested with Haute-Savoie), with Swiss data keeping priority:
+  - terrain, contours, slopes and hill shading from IGN RGE ALTI 5 m, merged with swissALTI3D;
+  - base map from IGN BD TOPO, with rock and scree areas from OpenStreetMap;
+  - GR routes (red) and other marked hiking routes (yellow);
+  - nature reserves and protection orders in the winter overlay;
+  - Camptocamp ski touring routes, as tracks or as points with name and grade.
+- Coverage `dept:NN[,MM]` and combined coverages joined with `+`, e.g. `canton:VS+dept:74`.
+
+### Changed
+
+- Downloads send a user agent, required by the IGN download service.
+- Tiles are rebuilt automatically when a French department becomes available.
+
+### Fixed
+
+- Large coverages failed on Windows: mkgmap options are now passed through a config file instead of the
+  command line, and tile descriptions are cut to the 50 characters Garmin allows.
+
 ## [0.1.0] - 2026-11-03
 
 First release.

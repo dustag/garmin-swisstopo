@@ -15,6 +15,8 @@ load_dotenv(REPO_DIR / ".env")
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path.home() / "swisstopo-data")).expanduser()
 DOWNLOAD_DIR = DATA_DIR / "download"
 ALTI_DIR = DOWNLOAD_DIR / "alti3d_5m"     # swissALTI3D resampled to 5 m, one file per km2
+FRANCE_DIR = DOWNLOAD_DIR / "fr"          # French data, one sub-directory per department
+ALTI_FR_DIR = DOWNLOAD_DIR / "rgealti_5m"  # RGE ALTI reprojected to LV95, 5 m, one file per km2
 WORK_DIR = DATA_DIR / "work"
 TILES_DIR = WORK_DIR / "tiles"             # per-tile intermediates, shared by all coverages
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", DATA_DIR / "output")).expanduser()
@@ -23,8 +25,9 @@ TOOLS_DIR = Path(os.environ.get("TOOLS_DIR", REPO_DIR / "tools")).expanduser()
 JAVA = os.environ.get("JAVA_EXE", "java")
 JAVA_MAX_HEAP = os.environ.get("JAVA_MAX_HEAP", "4g")
 
-# Coverage to build: an area name, "switzerland", "canton:VS[,VD...]" or
-# "bbox:E0,N0,E1,N1" (LV95 metres). Can be overridden with --coverage.
+# Coverage to build: an area name, "switzerland", "canton:VS[,VD...]", "dept:74[,73...]"
+# (French departments) or "bbox:E0,N0,E1,N1" (LV95 metres); several can be
+# combined with "+", e.g. "canton:VS+dept:74". Can be overridden with --coverage.
 COVERAGE = os.environ.get("COVERAGE", "telliers")
 
 # Maps are cut into square tiles of a fixed LV95 grid. Each tile is built once
@@ -46,6 +49,10 @@ CUSTOM_BBOX_FAMILY_ID = 6590
 CANTONS = ["ZH", "BE", "LU", "UR", "SZ", "OW", "NW", "GL", "ZG", "FR", "SO", "BS", "BL",
            "SH", "AR", "AI", "SG", "GR", "AG", "TG", "TI", "VD", "VS", "NE", "GE", "JU"]
 CANTON_FAMILY_ID = 6600
+# French departments: family id = 6700 + 2 * department number
+DEPT_FAMILY_ID = 6700
+# Combined coverages ("a+b"): family id = 7000 + 2 * (stable hash of the spec % 1000)
+COMBINED_FAMILY_ID = 7000
 FAMILY_NAME = "Swisstopo CAS"
 
 # Label language: fr, de, it, rm (Romansh) or en. Place names always stay in
@@ -55,7 +62,16 @@ if LANG not in ("fr", "de", "it", "rm", "en"):
     raise ValueError(f"LANG_LABELS must be fr, de, it, rm or en (got {LANG!r})")
 DATA_LANG = "de" if LANG == "rm" else LANG
 
+# French departments whose data is used. Switzerland always has priority: French
+# data only fills the parts of a tile outside Switzerland.
+FRANCE_DEPTS = [d.strip() for d in os.environ.get("FRANCE_DEPTS", "74").split(",") if d.strip()]
+
 STAC = "https://data.geo.admin.ch/api/stac/v0.9"
+IGN_DOWNLOAD = "https://data.geopf.fr/telechargement"
+GEO_API_GOUV = "https://geo.api.gouv.fr"
+OVERPASS = "https://overpass-api.de/api/interpreter"
+CAMPTOCAMP_API = "https://api.camptocamp.org"
+USER_AGENT = "swisstopo-garmin (https://github.com/dustag/garmin-swisstopo)"
 GEOADMIN_API = "https://api3.geo.admin.ch/rest/services/api/MapServer"
 SOURCES = {
     "tlm3d": "https://data.geo.admin.ch/ch.swisstopo.swisstlm3d/swisstlm3d_2026-02/swisstlm3d_2026-02_2056_5728.gpkg.zip",
