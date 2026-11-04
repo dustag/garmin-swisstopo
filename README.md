@@ -126,6 +126,8 @@ flowchart LR
 | `osmwriter.py` | Writes shapely geometries (LV95) to OSM XML (WGS84), including multipolygons with holes |
 | `.env.example` | Template of the local configuration (copy to `.env`) |
 | `requirements.txt` | Python dependencies |
+| `packaging/` | Standalone application: `build_app.py` (build script), PyInstaller recipe, entry point |
+| `.github/workflows/package.yml` | Builds the application for Windows and macOS and attaches it to the releases |
 
 Data stays outside the repository, in `DATA_DIR`:
 
@@ -144,6 +146,23 @@ DATA_DIR/
 │   └── coverages/<name>/  hgt files, generated style and TYP, mkgmap output
 └── output/                final .img files
 ```
+
+---
+
+## Ready-to-use application
+
+The [releases](https://github.com/dustag/garmin-swisstopo/releases) have an application for Windows and
+macOS that holds everything it needs (Python, the libraries, Java and mkgmap): nothing to install.
+
+- **Windows**: unzip `swisstopo-garmin-<version>-windows-x64.zip` anywhere and start
+  `swisstopo-garmin\swisstopo-garmin.exe`. The application is not signed: on the first start, Windows
+  SmartScreen may show a warning, click **More info** then **Run anyway**.
+- **macOS** (Apple silicon): open `swisstopo-garmin-<version>-macos-arm64.dmg` and drag the application to
+  **Applications**. It is not signed by Apple: on the first start, macOS refuses to open it; go to
+  **System Settings > Privacy & Security** and click **Open Anyway**.
+
+The data is downloaded to `swisstopo-data` in the home folder (about 20 GB for all of Switzerland), the
+folder can be changed in the window. Everything below is only needed to work on the code.
 
 ---
 
@@ -270,6 +289,22 @@ instead, such as `canton:VS+dept:74`.
   OpenStreetMap (South Tyrol, Aosta Valley) are replaced by the name in the label language when there is one.
 
 Changing `LANG_LABELS` rebuilds the tiles automatically on the next run.
+
+### Building the application
+
+```powershell
+pip install -r packaging/requirements.txt
+python packaging/build_app.py
+```
+
+The script needs a JDK 21 or newer for `jlink` (`JAVA_HOME`, `jlink` in the PATH, or `JAVA_EXE` of `.env`).
+It downloads mkgmap, makes a minimal Java runtime with the modules mkgmap uses, bundles everything with
+PyInstaller and writes the archive of the current platform to `dist/`, with the version of `CHANGELOG.md`.
+Intermediate files go to the temporary folder (`APP_BUILD_DIR` to change it), out of synced folders.
+
+PyInstaller only builds for the platform it runs on. The GitHub workflow `.github/workflows/package.yml`
+builds Windows and macOS when a release is published, and attaches both archives to it; it can also be run
+by hand from the Actions tab.
 
 ---
 

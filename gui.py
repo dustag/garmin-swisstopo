@@ -3,15 +3,13 @@
     python gui.py
 
 Downloads and builds run download.py and build.py in a child process whose output
-is shown in the window. Packaged (frozen) builds run the same executable with a
-"download" or "build" argument instead of the scripts.
+is shown in the window. The packaged application (packaging/launcher.py) runs its
+own executable with a "download" or "build" argument instead of the scripts.
 
 The window follows the language chosen for the map labels (at first start, the
 system language, or English); its texts are translated in i18n.py.
 """
-import importlib
 import math
-import multiprocessing
 import os
 import re
 import shutil
@@ -675,11 +673,6 @@ class MainWindow(QMainWindow):
 
 
 def main():
-    multiprocessing.freeze_support()
-    if len(sys.argv) > 1 and sys.argv[1] in ("download", "build"):   # child process of a packaged build
-        module = importlib.import_module(sys.argv[1])
-        sys.argv = [f"{sys.argv[1]}.py"] + sys.argv[2:]
-        sys.exit(module.main())
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
