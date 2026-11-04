@@ -21,9 +21,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-14: Apple silicon (macos-latest jobs were not getting a runner);
-        # macos-15-intel: Intel, the last x86_64 runner of GitHub
-        os: [windows-latest, macos-14, macos-15-intel]
+        # macos-15: Apple silicon; macos-15-intel: Intel, the last x86_64 runner of GitHub.
+        # macOS 15 at least: older ones have no wheels of rasterio and pyproj for Python 3.14
+        os: [windows-latest, macos-15, macos-15-intel]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
