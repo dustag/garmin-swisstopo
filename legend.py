@@ -96,7 +96,8 @@ BASE = [
     Cat("road", "line", 0x06, 19, line("#FFFFFF", 2, "#3C3C3C")),
     Cat("track", "line", 0x07, 21, line("#3C3C3C", 2)),
     Cat("path", "line", 0x16, 22, dashed("#3C3C3C", 1, 6, 3)),
-    # Swiss hiking signage (yellow / white-red-white / white-blue-white)
+    # Swiss hiking signage (yellow / white-red-white / white-blue-white); Italian
+    # paths take the category matching their OpenStreetMap SAC scale
     Cat("hike_t1", "line", 0x0F, 21, dashed("#E0A100", 2, 8, 3)),
     Cat("hike_t2", "line", 0x10, 21, dashed("#E2001A", 2, 8, 3)),
     Cat("hike_t3", "line", 0x11, 21, dashed("#0055C8", 2, 5, 4)),
@@ -135,7 +136,7 @@ WINTER = [
     Cat("wildlife_edge_binding", "line", 0x05, 19, line("#D00000", 2), name=None),
     Cat("wildlife_edge_advised", "line", 0x06, 19, dashed("#E07000", 2, 6, 3), name=None),
     Cat("wildlife_route", "line", 0x0B, 21, dashed("#00A040", 2, 3, 2)),
-    # French nature reserves and protection orders (rules vary: check them before the trip)
+    # French and Italian nature reserves and protected areas (rules vary: check them before the trip)
     Cat("nature_reserve", "polygon", 0x07, 19, pattern("#2E8B57", HATCH_DIAG_SPARSE), order=5),
     Cat("nature_reserve_edge", "line", 0x0D, 19, dashed("#2E8B57", 2, 6, 3), name=None),
     # Routes (Swisstopo snow sports map colours)
@@ -147,7 +148,7 @@ WINTER = [
     Cat("ski_down", "line", 0x08, 19, bitmap_line(SKI, ["--------x--x----", "---------x--x---", "xxxxxxxxxxxxxxxx", "---------x--x---", "--------x--x----"]), name=None),
     Cat("snowshoe", "line", 0x09, 19, dashed("#C2007A", 2, 7, 2), name=None),
     Cat("snowshoe_route_label", "line", 0x0A, 21, line("#C2007A", 1)),
-    # Camptocamp ski touring routes (France): track when available, otherwise a point
+    # Camptocamp ski touring routes (France, Italy): track when available, otherwise a point
     Cat("ski_c2c", "line", 0x0C, 19, dashed(SKI, 2, 6, 2)),
     Cat("ski_c2c_point", "point", 0x6610, 20,
         icon(["..x..", ".xxx.", "xxxxx", ".xxx.", "..x.."], {"x": SKI}), extra=["FontStyle=SmallFont"]),
@@ -212,10 +213,10 @@ LABELS = {  # key: (fr, de, it, rm, en)
                               "Cunfin zona da selvaschina (rec.)", "Wildlife zone boundary (advised)"),
     "wildlife_route": ("Itinéraire autorisé (zone faune)", "Erlaubte Route (Wildschutz)", "Itinerario autorizzato (fauna)",
                        "Itinerari permess (selvaschina)", "Allowed route (wildlife zone)"),
-    "nature_reserve": ("Réserve / protection (FR)", "Schutzgebiet (FR)", "Riserva / protezione (FR)",
-                       "Reservat / protecziun (FR)", "Nature reserve (FR)"),
-    "nature_reserve_edge": ("Limite réserve (FR)", "Grenze Schutzgebiet (FR)", "Limite riserva (FR)",
-                            "Cunfin reservat (FR)", "Nature reserve boundary (FR)"),
+    "nature_reserve": ("Réserve / protection (FR/IT)", "Schutzgebiet (FR/IT)", "Riserva / protezione (FR/IT)",
+                       "Reservat / protecziun (FR/IT)", "Nature reserve (FR/IT)"),
+    "nature_reserve_edge": ("Limite réserve (FR/IT)", "Grenze Schutzgebiet (FR/IT)", "Limite riserva (FR/IT)",
+                            "Cunfin reservat (FR/IT)", "Nature reserve boundary (FR/IT)"),
     "ski_c2c": ("Itinéraire ski Camptocamp", "Skitour Camptocamp", "Itinerario sci Camptocamp",
                 "Itinerari da skis Camptocamp", "Camptocamp ski route"),
     "ski_c2c_point": ("Course ski Camptocamp", "Skitour Camptocamp (Punkt)", "Gita sci Camptocamp",

@@ -1,7 +1,7 @@
 """Build the Garmin maps (.img) for a coverage.
 
     python build.py                          # coverage from .env
-    python build.py --coverage canton:VS     # area name, switzerland, canton:XX[,YY], bbox:E0,N0,E1,N1
+    python build.py --coverage canton:VS     # area name, switzerland, canton:XX, dept:NN, it:XX, bbox:...
     python build.py --no-dem                 # without hill shading
     python build.py --step osm               # only build the tiles (OSM / elevation samples)
     python build.py --step mkgmap            # only compile (tiles already built)
@@ -32,6 +32,7 @@ from skimage.measure import find_contours
 import config
 import coverage
 import france
+import italy
 import legend
 from coverage import Tile
 from osmwriter import OsmWriter
@@ -49,15 +50,15 @@ TILE_FORMAT = 3   # bump to invalidate already built tiles when the tile content
 class Dem:
     """Terrain at DEM_RES over a bbox, smoothed; `ok` is False when there is no data.
 
-    swissALTI3D comes first, so Switzerland has priority; RGE ALTI (France) only
-    fills the cells swissALTI3D does not cover.
+    swissALTI3D comes first, so Switzerland has priority; RGE ALTI (France), then
+    TINITALY (Italy) only fill the cells not covered yet.
     """
 
     def __init__(self, bbox):
         e0, n0, e1, n1 = bbox
         keys = [f"{e}-{n}" for e in range(int(e0 // 1000), int(-(-e1 // 1000)))
                 for n in range(int(n0 // 1000), int(-(-n1 // 1000)))]
-        files = [d / f"{k}.tif" for d in (config.ALTI_DIR, config.ALTI_FR_DIR) for k in keys]
+        files = [d / f"{k}.tif" for d in (config.ALTI_DIR, config.ALTI_FR_DIR, config.ALTI_IT_DIR) for k in keys]
         files = [f for f in files if f.exists()]
         self.ok = bool(files)
         if not self.ok:
@@ -401,14 +402,21 @@ def french_depts(tile: Tile):
     return [c for c in config.FRANCE_DEPTS if france.is_ready(c) and coverage.department(c).intersects(box)]
 
 
+def italian_zones(tile: Tile):
+    """Italian zones with downloaded data that have land in the tile."""
+    box = shapely.box(*tile.bounds)
+    return [c for c in config.ITALY_ZONES if italy.is_ready(c) and italy.zone_area(c).intersects(box)]
+
+
 def build_tile(tile: Tile, force=False):
     """Build the OSM files and elevation samples of one tile; returns a status dict."""
     out = config.TILES_DIR / tile.name
     status_file = out / "status.json"
-    depts = french_depts(tile)
+    depts, zones = french_depts(tile), italian_zones(tile)
     if not force and status_file.exists():
         status = json.loads(status_file.read_text())
-        if (status.get("format"), status.get("lang"), status.get("fr", [])) == (TILE_FORMAT, config.LANG, depts):
+        if ((status.get("format"), status.get("lang"), status.get("fr", []), status.get("it", []))
+                == (TILE_FORMAT, config.LANG, depts, zones)):
             return status | {"cached": True}
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
@@ -416,6 +424,13 @@ def build_tile(tile: Tile, force=False):
     ctx = TileContext(tile)
     in_ch = coverage.switzerland().intersects(shapely.box(*tile.bounds))
     french = [ft for ft in (france.FrenchTile(ctx, c) for c in depts) if not ft.empty]
+    italian = []
+    if zones:
+        # Switzerland and the French departments keep priority over the Italian zones
+        box = shapely.box(*tile.bounds).buffer(500)
+        foreign = shapely.union_all([shapely.intersection(shapely.make_valid(g), box) for g in
+                                     [coverage.switzerland()] + [coverage.department(c) for c in depts]])
+        italian = italy.zone_tiles(ctx, zones, foreign)
     e0, n0, e1, n1 = tile.bounds
     dem = Dem((e0 - DEM_MARGIN, n0 - DEM_MARGIN, e1 + DEM_MARGIN, n1 + DEM_MARGIN))
     counts = {}
@@ -426,6 +441,8 @@ def build_tile(tile: Tile, force=False):
             write_base(ctx, osm)
         for ft in french:
             france.write_base(ft, osm, dem)
+        for it in italian:
+            italy.write_base(it, osm, dem)
         counts["base"] = osm.count
     with OsmWriter(tile_osm(tile, "hiver")) as osm:
         if dem.ok:
@@ -435,10 +452,13 @@ def build_tile(tile: Tile, force=False):
             write_wildlife(ctx, osm)
         for ft in french:
             france.write_winter(ft, osm)
+        for it in italian:
+            italy.write_winter(it, osm)
         counts["hiver"] = osm.count
     if dem.ok:
         np.savez_compressed(out / "hgt.npz", **hgt_samples(dem, tile))
-    status = {"tile": tile.name, "format": TILE_FORMAT, "lang": config.LANG, "fr": depts, "counts": counts}
+    status = {"tile": tile.name, "format": TILE_FORMAT, "lang": config.LANG, "fr": depts, "it": zones,
+              "counts": counts}
     status_file.write_text(json.dumps(status))
     return status
 
@@ -450,6 +470,8 @@ def build_tiles(cov: coverage.Coverage, jobs: int, force: bool):
     coverage.switzerland()
     for code in config.FRANCE_DEPTS:
         coverage.department(code)
+    for code in config.ITALY_ZONES:
+        coverage.italy_zone(code)
     done = 0
     with ProcessPoolExecutor(jobs) as pool:
         futures = {pool.submit(build_tile, t, force): t for t in cov.tiles}
@@ -487,7 +509,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
     opts = [f"output-dir={out}", f"style-file={style}", "code-page=1252", f"max-jobs={jobs}",
             f"family-id={family_id}", "product-id=1", f"family-name={title}", f"series-name={title}",
             f"area-name={cov.name}", f"draw-priority={DRAW_PRIORITY[layer_key]}",
-            "copyright-message=(c) swisstopo, OFEV/BAFU, CAS/SAC, IGN, OpenStreetMap, Camptocamp",
+            "copyright-message=(c) swisstopo, OFEV/BAFU, CAS/SAC, IGN, INGV, OpenStreetMap, Camptocamp",
             "merge-lines",
             # Both maps are transparent: the base map is made opaque by its "land"
             # polygon over Switzerland only, so other maps still show abroad.
@@ -522,7 +544,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--coverage", default=config.COVERAGE,
-                    help="area name, switzerland, canton:XX[,YY] or bbox:E0,N0,E1,N1")
+                    help="area name, switzerland, canton:XX[,YY], dept:NN, it[:XX] or bbox:E0,N0,E1,N1")
     ap.add_argument("--no-dem", action="store_true", help="without hill shading")
     ap.add_argument("--step", choices=["all", "osm", "mkgmap"], default="all")
     ap.add_argument("--force", action="store_true", help="rebuild tiles even if already built")

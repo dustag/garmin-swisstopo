@@ -26,6 +26,7 @@ import shapely
 import config
 import coverage
 import france
+import italy
 
 ALTI_RES = 5  # m
 LEGACY_2M_DIR = config.DOWNLOAD_DIR / "alti3d"   # 2 m tiles kept by earlier versions
@@ -129,7 +130,7 @@ def get_alti(key, href):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--coverage", default=config.COVERAGE,
-                    help="area name, switzerland, canton:XX[,YY] or bbox:E0,N0,E1,N1")
+                    help="area name, switzerland, canton:XX[,YY], dept:NN, it[:XX] or bbox:E0,N0,E1,N1")
     ap.add_argument("--jobs", type=int, default=8, help="parallel downloads")
     args = ap.parse_args()
 
@@ -159,6 +160,12 @@ def main():
         if coverage.department(code).intersects(tiles) and not france.is_ready(code):
             print(f"France, department {code}:")
             france.download_dept(code, fetch)
+
+    # Italian zones touching the coverage
+    zones = [c for c in config.ITALY_ZONES if italy.zone_area(c).intersects(tiles) and not italy.is_ready(c)]
+    if zones:
+        print(f"Italy, zones {', '.join(zones)}:")
+        italy.download_zones(zones, fetch)
 
     unzip(fetch("https://www.mkgmap.org.uk/download/mkgmap-latest.zip", config.TOOLS_DIR / "mkgmap-latest.zip"))
     print("Downloads complete.")

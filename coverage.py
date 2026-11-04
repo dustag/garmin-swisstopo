@@ -6,12 +6,15 @@ Garmin map id, so a tile built once can be reused by every coverage.
 """
 import json
 import math
+import shutil
 import urllib.parse
 import urllib.request
+import zipfile
 import zlib
 from dataclasses import dataclass
 
 import numpy as np
+import pyogrio
 import shapely
 from pyproj import Transformer
 
@@ -107,9 +110,56 @@ def department(code: str):
     return geom
 
 
+def _istat(layer: str):
+    """ISTAT boundary layer ("ProvCM" provinces, "Com" municipalities) in LV95, downloaded once."""
+    d = config.ITALY_DIR / "istat"
+    shp = next(d.glob(f"{layer}*/*.shp"), None) if d.exists() else None
+    if shp is None:
+        d.mkdir(parents=True, exist_ok=True)
+        archive = d / "limiti.zip"
+        req = urllib.request.Request(config.ISTAT_BOUNDARIES, headers={"User-Agent": config.USER_AGENT})
+        with urllib.request.urlopen(req) as r, open(archive, "wb") as f:
+            shutil.copyfileobj(r, f)
+        with zipfile.ZipFile(archive) as z:
+            z.extractall(d)
+        archive.unlink()
+        shp = next(d.glob(f"{layer}*/*.shp"))
+    return pyogrio.read_dataframe(shp).to_crs(2056)
+
+
+def italy_zone(code: str):
+    """Outline of an Italian zone in LV95 (cached): a province (ISTAT abbreviation),
+    or GP, the Piedmont side of the Gran Paradiso."""
+    cache = config.ITALY_DIR / code / "outline.wkb"
+    if cache.exists():
+        return shapely.from_wkb(cache.read_bytes())
+    if code == "GP":
+        df = _istat("Com")
+        df = df[df.COMUNE.isin(config.GRAN_PARADISO) & (df.COD_PROV == 1)]
+    else:
+        df = _istat("ProvCM")
+        df = df[df.SIGLA == code]
+    if df.empty:
+        raise ValueError(f"unknown Italian zone {code!r}: use a province abbreviation (AO, VB...) or GP")
+    geom = shapely.union_all(df.geometry.values)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    # ISTAT codes: the region picks the OpenStreetMap extract, the province the family id
+    (cache.parent / "region").write_text(str(int(df.COD_REG.iloc[0])))
+    (cache.parent / "province").write_text(str(int(df.COD_PROV.iloc[0])))
+    cache.write_bytes(shapely.to_wkb(geom))
+    return geom
+
+
+def italy_zone_code(code: str, what: str) -> int:
+    """ISTAT "region" or "province" code of an Italian zone."""
+    italy_zone(code)
+    return int((config.ITALY_DIR / code / what).read_text())
+
+
 def resolve(spec: str) -> Coverage:
     """Coverage from a spec: area name, "switzerland", "canton:VS,VD", "dept:74,73",
-    "bbox:E0,N0,E1,N1", or several of them joined with "+"."""
+    "it:AO,GP" (or "it" for config.ITALY_ZONES), "bbox:E0,N0,E1,N1", or several of
+    them joined with "+"."""
     if "+" in spec:
         parts = [resolve(p) for p in spec.split("+")]
         tiles = sorted({t for c in parts for t in c.tiles}, key=lambda t: (t.e, t.n))
@@ -135,8 +185,13 @@ def resolve(spec: str) -> Coverage:
         geom = shapely.union_all([department(c) for c in codes])
         fid = config.DEPT_FAMILY_ID + 2 * int(codes[0])
         return Coverage("fr" + "-".join(codes), fid, tiles_for(geom))
+    if kind == "it" or spec == "it":
+        codes = [c.strip().upper() for c in arg.split(",")] if arg else config.ITALY_ZONES
+        geom = shapely.union_all([italy_zone(c) for c in codes])
+        prov = 99 if codes[0] == "GP" else italy_zone_code(codes[0], "province") % 100
+        return Coverage("it" + "-".join(codes).lower(), config.ITALY_FAMILY_ID + 2 * prov, tiles_for(geom))
     if kind == "bbox":
         bbox = [float(v) for v in arg.split(",")]
         return Coverage("custom", config.CUSTOM_BBOX_FAMILY_ID, tiles_for(shapely.box(*bbox)))
     raise ValueError(f"unknown coverage {spec!r}: use an area ({', '.join(config.AREAS)}), "
-                     "switzerland, canton:XX, dept:NN or bbox:E0,N0,E1,N1, joined with + if needed")
+                     "switzerland, canton:XX, dept:NN, it[:XX] or bbox:E0,N0,E1,N1, joined with + if needed")

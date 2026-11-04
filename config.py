@@ -17,6 +17,8 @@ DOWNLOAD_DIR = DATA_DIR / "download"
 ALTI_DIR = DOWNLOAD_DIR / "alti3d_5m"     # swissALTI3D resampled to 5 m, one file per km2
 FRANCE_DIR = DOWNLOAD_DIR / "fr"          # French data, one sub-directory per department
 ALTI_FR_DIR = DOWNLOAD_DIR / "rgealti_5m"  # RGE ALTI reprojected to LV95, 5 m, one file per km2
+ITALY_DIR = DOWNLOAD_DIR / "it"           # Italian data, one sub-directory per zone
+ALTI_IT_DIR = DOWNLOAD_DIR / "tinitaly_5m"  # TINITALY reprojected to LV95, 5 m, one file per km2
 WORK_DIR = DATA_DIR / "work"
 TILES_DIR = WORK_DIR / "tiles"             # per-tile intermediates, shared by all coverages
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", DATA_DIR / "output")).expanduser()
@@ -26,7 +28,7 @@ JAVA = os.environ.get("JAVA_EXE", "java")
 JAVA_MAX_HEAP = os.environ.get("JAVA_MAX_HEAP", "4g")
 
 # Coverage to build: an area name, "switzerland", "canton:VS[,VD...]", "dept:74[,73...]"
-# (French departments) or "bbox:E0,N0,E1,N1" (LV95 metres); several can be
+# (French departments), "it:AO[,GP...]" (Italian zones), "it" (all ITALY_ZONES) or "bbox:E0,N0,E1,N1" (LV95 metres); several can be
 # combined with "+", e.g. "canton:VS+dept:74". Can be overridden with --coverage.
 COVERAGE = os.environ.get("COVERAGE", "telliers")
 
@@ -51,9 +53,11 @@ CANTONS = ["ZH", "BE", "LU", "UR", "SZ", "OW", "NW", "GL", "ZG", "FR", "SO", "BS
 CANTON_FAMILY_ID = 6600
 # French departments: family id = 6700 + 2 * department number
 DEPT_FAMILY_ID = 6700
+# Italian zones: family id = 6800 + 2 * (ISTAT province code % 100); GP uses 99
+ITALY_FAMILY_ID = 6800
 # Combined coverages ("a+b"): family id = 7000 + 2 * (stable hash of the spec % 1000)
 COMBINED_FAMILY_ID = 7000
-FAMILY_NAME = "Swisstopo CAS"
+FAMILY_NAME = "Swisstopo"
 
 # Label language: fr, de, it, rm (Romansh) or en. Place names always stay in
 # their official local form; source attributes without Romansh fall back to German.
@@ -66,9 +70,20 @@ DATA_LANG = "de" if LANG == "rm" else LANG
 # data only fills the parts of a tile outside Switzerland.
 FRANCE_DEPTS = [d.strip() for d in os.environ.get("FRANCE_DEPTS", "74").split(",") if d.strip()]
 
+# Italian zones whose data is used: provinces by their ISTAT abbreviation (AO, VB...)
+# or GP, the Piedmont side of the Gran Paradiso (its municipalities in the province
+# of Turin). The default covers the provinces bordering Switzerland and the whole
+# Gran Paradiso. Switzerland and the French departments have priority.
+ITALY_ZONES = [z.strip().upper() for z in os.environ.get("ITALY_ZONES", "AO,VB,VA,CO,SO,BZ,GP").split(",")
+               if z.strip()]
+GRAN_PARADISO = ["Ceresole Reale", "Locana", "Noasca", "Ribordone", "Ronco Canavese", "Valprato Soana"]
+
 STAC = "https://data.geo.admin.ch/api/stac/v0.9"
 IGN_DOWNLOAD = "https://data.geopf.fr/telechargement"
 GEO_API_GOUV = "https://geo.api.gouv.fr"
+ISTAT_BOUNDARIES = "https://www.istat.it/storage/cartografia/confini_amministrativi/generalizzati/2025/Limiti01012025_g.zip"
+TINITALY = "https://tinitaly.pi.ingv.it/data_1.1"
+GEOFABRIK = "https://download.geofabrik.de/europe/italy"
 OVERPASS = "https://overpass-api.de/api/interpreter"
 CAMPTOCAMP_API = "https://api.camptocamp.org"
 USER_AGENT = "swisstopo-garmin (https://github.com/dustag/garmin-swisstopo)"
