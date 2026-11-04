@@ -7,6 +7,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-04
+
+### Added
+
+- Configuration window (`python gui.py`, PySide6): the cantons, French departments and Italian zones
+  are picked on a map, with the maps to build (summer, winter or both), the label language, hill shading
+  and folders, and an estimate of the map size; the window runs the download and the build, shows their
+  log and progress, and can cancel them.
+- `build.py --maps base|hiver`: compile only the base map or only the winter overlay.
+- The window and the zone names follow the label language (French, German, Italian or English); at first
+  start, the system language, or English if it is none of them.
+
+### Removed
+
+- Romansh (`LANG_LABELS=rm`): the labels are in French, German, Italian or English.
+
 ## [0.3.0] - 2026-11-04
 
 ### Added
@@ -84,7 +100,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dustag/garmin-swisstopo/releases/tag/v0.1.0

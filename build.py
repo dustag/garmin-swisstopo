@@ -3,6 +3,7 @@
     python build.py                          # coverage from .env
     python build.py --coverage canton:VS     # area name, switzerland, canton:XX, dept:NN, it:XX, bbox:...
     python build.py --no-dem                 # without hill shading
+    python build.py --maps hiver             # only the winter overlay (base, hiver or both)
     python build.py --step osm               # only build the tiles (OSM / elevation samples)
     python build.py --step mkgmap            # only compile (tiles already built)
     python build.py --force                  # rebuild tiles even if already built
@@ -331,7 +332,7 @@ def write_ski(ctx: TileContext, osm: OsmWriter, dem: Dem):
             key = "ski"
         osm.add(g, {"k": key})
 
-    diff_col = f"difficulty_{config.DATA_LANG}"
+    diff_col = f"difficulty_{config.LANG}"
     df = ctx.read("ski_routes_2056", ["route_nr", "target_name", diff_col], path=next(SKI.glob("ski_routes*.gpkg")))
     for g, nr, target, diff in zip(df.geometry, df.route_nr, df.target_name, df[diff_col]):
         if isinstance(nr, str):
@@ -371,7 +372,7 @@ def fetch_wildlife(bbox):
 
 def write_wildlife(ctx: TileContext, osm: OsmWriter):
     # The API provides de/fr/it attributes only
-    lang = config.DATA_LANG if config.DATA_LANG in ("de", "fr", "it") else "de"
+    lang = config.LANG if config.LANG in ("de", "fr", "it") else "de"
     for layer, f in fetch_wildlife(ctx.bounds):
         p = f["properties"]
         geom = ctx.clip(shapely.geometry.shape(f["geometry"]))
@@ -546,6 +547,8 @@ def main():
     ap.add_argument("--coverage", default=config.COVERAGE,
                     help="area name, switzerland, canton:XX[,YY], dept:NN, it[:XX] or bbox:E0,N0,E1,N1")
     ap.add_argument("--no-dem", action="store_true", help="without hill shading")
+    ap.add_argument("--maps", nargs="+", choices=["base", "hiver"], default=["base", "hiver"],
+                    help="maps to compile: base map, winter overlay or both")
     ap.add_argument("--step", choices=["all", "osm", "mkgmap"], default="all")
     ap.add_argument("--force", action="store_true", help="rebuild tiles even if already built")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 1))
@@ -557,15 +560,17 @@ def main():
         print("Tiles...")
         build_tiles(cov, args.jobs, args.force)
     if args.step in ("all", "mkgmap"):
-        dem_dir = None
-        if not args.no_dem:
-            print("Hill shading (hgt)...")
-            dem_dir = config.WORK_DIR / "coverages" / cov.name / "hgt"
-            assemble_hgt(cov, dem_dir)
-        print("mkgmap base...")
-        mkgmap(cov, "base", args.jobs, dem_dir)
-        print("mkgmap winter...")
-        mkgmap(cov, "hiver", args.jobs)
+        if "base" in args.maps:
+            dem_dir = None
+            if not args.no_dem:
+                print("Hill shading (hgt)...")
+                dem_dir = config.WORK_DIR / "coverages" / cov.name / "hgt"
+                assemble_hgt(cov, dem_dir)
+            print("mkgmap base...")
+            mkgmap(cov, "base", args.jobs, dem_dir)
+        if "hiver" in args.maps:
+            print("mkgmap winter...")
+            mkgmap(cov, "hiver", args.jobs)
 
 
 if __name__ == "__main__":

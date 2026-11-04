@@ -225,7 +225,7 @@ def download_camptocamp(d: Path, outline, what):
         else:
             shape = _geojson_2d(geom["geom"])
         if shape is not None:
-            rows.append({"id": doc["document_id"], "label": _c2c_label(doc, config.DATA_LANG), "geometry": shape})
+            rows.append({"id": doc["document_id"], "label": _c2c_label(doc, config.LANG), "geometry": shape})
     df = gpd.GeoDataFrame(rows, crs=3857).to_crs(LV95)
     pyogrio.write_dataframe(df, dest, layer="routes")
 
