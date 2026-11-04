@@ -192,9 +192,11 @@ def _c2c_label(doc, lang):
     return f"{name} ({grades})" if grades else name
 
 
-def download_camptocamp(code, outline):
-    """Ski touring routes from Camptocamp: tracks when available, otherwise a point."""
-    dest = dept_dir(code) / "c2c_ski.gpkg"
+def download_camptocamp(d: Path, outline, what):
+    """Ski touring routes from Camptocamp into d: tracks when available, otherwise a point.
+
+    Also used for the Italian zones (what names the area in messages)."""
+    dest = d / "c2c_ski.gpkg"
     if dest.exists():
         return
     e0, n0, e1, n1 = outline.bounds
@@ -207,9 +209,9 @@ def download_camptocamp(code, outline):
         offset += 100
         if offset >= page["total"]:
             break
-    print(f"  Camptocamp {code}: {len(docs)} ski touring routes")
+    print(f"  Camptocamp {what}: {len(docs)} ski touring routes")
     # Tracks already fetched are kept in a cache, so an interrupted run resumes
-    cache_file = dept_dir(code) / "c2c_tracks.json"
+    cache_file = d / "c2c_tracks.json"
     cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
     rows = []
     for doc in docs:
@@ -246,7 +248,7 @@ def download_dept(code, fetch):
     download_bdtopo(code, fetch)
     download_rgealti(code, fetch, outline)
     download_osm_rock(code, outline)
-    download_camptocamp(code, outline)
+    download_camptocamp(dept_dir(code), outline, code)
     (dept_dir(code) / "ready").touch()
 
 

@@ -7,6 +7,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-04
+
+### Added
+
+- Italian Alps along the Swiss border (`ITALY_ZONES`): the provinces of Aosta, Verbano-Cusio-Ossola,
+  Varese, Como, Sondrio and Bolzano, and the Piedmont side of the Gran Paradiso, with Swiss and French
+  data keeping priority:
+  - terrain, contours, slopes and hill shading from INGV TINITALY 10 m;
+  - base map from OpenStreetMap, with paths in the Swiss hiking colours after their SAC scale;
+  - parks and nature reserves, and Camptocamp ski touring routes, in the winter overlay.
+- Coverage `it:XX[,YY]`, and `it` for all the Italian zones.
+
+### Changed
+
+- The nature reserve legend entries now read "(FR/IT)".
+- Maps are named "Swisstopo base/hiver …" instead of "Swisstopo CAS …": the project is independent of
+  the Swiss Alpine Club.
+
 ## [0.2.0] - 2026-11-04
 
 ### Added
@@ -66,6 +84,7 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dustag/garmin-swisstopo/releases/tag/v0.1.0
