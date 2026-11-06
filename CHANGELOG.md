@@ -7,6 +7,35 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-06
+
+### Added
+
+- Austrian Alps (`AUSTRIA_ZONES`, 19 NUTS 3 regions from Vorarlberg to Lower Austria), the Allgäu
+  (`GERMANY_ZONES`), the Spanish Pyrenees (`SPAIN_ZONES`: Navarre, Huesca, Lleida, Girona) and Andorra,
+  mapped from OpenStreetMap like Italy, with Swiss, French, then Italian data keeping priority:
+  - terrain from DGM Österreich 10 m, the Bavarian DGM1 (averaged to 5 m), the Spanish IGN MDT 5 m and
+    Copernicus GLO-30 for Andorra;
+  - zone outlines from Eurostat (GISCO NUTS 3).
+- French Pyrenees: departments 64, 65, 31, 09 and 66 added to the default `FRANCE_DEPTS`.
+- Coverages `at:`, `de:`, `es:`, `ad`, and the aliases `alpes` and `pyrenees`: two maps that can be
+  installed together.
+- Ski touring routes mapped in OpenStreetMap, in the winter overlay outside Switzerland.
+- Configuration window: the new zones, and the Pyrenees in a framed inset below the Alps.
+
+### Changed
+
+- The Italian terrain and map code is shared by all the countries mapped from OpenStreetMap
+  (`osmzone.py`, `countries.py`, `demsrc.py`); the Italian zones are extracted again once, for the ski
+  touring routes.
+- A coverage outside Switzerland no longer downloads the Swiss data.
+- Neighbouring OpenStreetMap zones are cut along their borders, without the 1 km margin kept towards
+  Switzerland and France: the extracts barely go past their borders.
+
+### Fixed
+
+- Hill shading west of Greenwich: the elevation files are named `W…`.
+
 ## [0.5.0] - 2026-11-04
 
 ### Added
@@ -115,7 +144,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.2.0...v0.3.0

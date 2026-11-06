@@ -22,7 +22,8 @@ from PySide6.QtCore import (QLibraryInfo, QLocale, QPointF, QProcess, QProcessEn
 from PySide6.QtGui import (QBrush, QColor, QDesktopServices, QFont, QFontDatabase, QFontMetricsF, QPainter,
                            QPainterPath, QPainterPathStroker, QPen, QPolygonF)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGraphicsItem,
-                               QGraphicsPathItem, QGraphicsScene, QGraphicsView, QGroupBox, QHBoxLayout, QLabel,
+                               QGraphicsPathItem, QGraphicsRectItem, QGraphicsScene, QGraphicsSimpleTextItem,
+                               QGraphicsView, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                                QSpinBox, QSplitter, QToolButton, QVBoxLayout, QWidget)
 
@@ -36,11 +37,13 @@ from i18n import tr
 
 REPO_DIR = Path(__file__).resolve().parent
 REPO_URL = "https://github.com/dustag/garmin-swisstopo"
-COUNTRY_COLORS = {"ch": QColor("#d52b1e"), "fr": QColor("#2f5fb3"), "it": QColor("#2e8b57")}
+COUNTRY_COLORS = {"ch": QColor("#d52b1e"), "fr": QColor("#2f5fb3"), "it": QColor("#2e8b57"),
+                  "at": QColor("#a0522d"), "de": QColor("#505050"), "es": QColor("#d9822b"), "ad": QColor("#7b4fa0")}
 LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "en": "English"}
 # Average size of a 10 km tile per map (base with hill shading), measured on the Switzerland +
-# Haute-Savoie (1.04 + 0.77 MB) and Switzerland + Haute-Savoie + Italy (0.97 + 0.82 MB) maps
-MB_PER_TILE = {"base": 1.0, "hiver": 0.8}
+# Haute-Savoie (1.04 + 0.77 MB), Switzerland + Haute-Savoie + Italy (0.97 + 0.82 MB) and Alps
+# with Austria and the Allgäu (0.92 + 0.87 MB) maps
+MB_PER_TILE = {"base": 0.95, "hiver": 0.85}
 MAP_NAMES = {"base": "été", "hiver": "hiver"}
 PROGRESS = re.compile(r"\[?(\d+)\s*/\s*(\d+)\]?")
 
@@ -50,6 +53,12 @@ def thousands(n: int) -> str:
 
 
 # --- Map -----------------------------------------------------------------------------------
+
+def offset(zone: dict) -> QPointF:
+    """Drawing offset of a zone (Pyrenees inset), scene units."""
+    dx, dy = zone.get("offset", (0, 0))
+    return QPointF(dx, -dy)
+
 
 class ZoneItem(QGraphicsPathItem):
     """A selectable zone outline (scene units: LV95 metres, y axis pointing down)."""
@@ -62,6 +71,7 @@ class ZoneItem(QGraphicsPathItem):
                 path.addPolygon(QPolygonF([QPointF(x, -y) for x, y in ring]))
                 path.closeSubpath()
         super().__init__(path)
+        self.setPos(offset(zone))
         self.zone = zone
         self.selected = False
         self.hovered = False
@@ -101,7 +111,7 @@ class LabelItem(QGraphicsItem):
         self.font.setBold(True)
         self.metrics = QFontMetricsF(self.font)
         self.text = zone["code"]
-        self.setPos(zone["label"][0], -zone["label"][1])
+        self.setPos(QPointF(zone["label"][0], -zone["label"][1]) + offset(zone))
         self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
         self.setAcceptedMouseButtons(Qt.NoButton)
         self.setZValue(10)
@@ -133,6 +143,27 @@ class LabelItem(QGraphicsItem):
         painter.fillPath(path, palette.text())
 
 
+class InsetFrame(QGraphicsRectItem):
+    """Dashed frame and title of the Pyrenees inset, drawn away from their true place."""
+
+    def __init__(self, rect: QRectF):
+        super().__init__(rect)
+        pen = QPen(QApplication.palette().text().color(), 1, Qt.DashLine)
+        pen.setCosmetic(True)
+        self.setPen(pen)
+        self.setAcceptedMouseButtons(Qt.NoButton)
+        self.title = QGraphicsSimpleTextItem(self)
+        font = QFont()
+        font.setBold(True)
+        self.title.setFont(font)
+        self.title.setBrush(QApplication.palette().text())
+        self.title.setFlag(QGraphicsItem.ItemIgnoresTransformations)
+        self.title.setPos(rect.topLeft())
+
+    def set_language(self):
+        self.title.setText(" " + tr("Pyrénées"))
+
+
 class MapView(QGraphicsView):
     """Zone map: wheel to zoom, drag to pan, click to select or deselect a zone."""
 
@@ -150,6 +181,14 @@ class MapView(QGraphicsView):
             label = LabelItem(zone)
             self.scene().addItem(label)
             self.labels.append(label)
+        inset = [i.sceneBoundingRect() for i in self.items_by_key.values() if "offset" in i.zone]
+        self.inset = None
+        if inset:
+            rect = inset[0]
+            for r in inset[1:]:
+                rect = rect.united(r)
+            self.inset = InsetFrame(rect.adjusted(-10_000, -15_000, 10_000, 10_000))
+            self.scene().addItem(self.inset)
         self.home = self.scene().itemsBoundingRect().adjusted(-5000, -5000, 5000, 5000)
         self.setSceneRect(self.home.adjusted(-100_000, -100_000, 100_000, 100_000))
         self.setRenderHint(QPainter.Antialiasing)
@@ -164,6 +203,8 @@ class MapView(QGraphicsView):
         for item in self.items_by_key.values():
             item.zone["name"] = zones.name(item.zone, lang)
             item.setToolTip(f"{item.zone['name']} ({thousands(item.zone['area_km2'])} km²)")
+        if self.inset:
+            self.inset.set_language()
         self.fit_labels()
 
     # Selection
@@ -248,6 +289,11 @@ def coverage_spec(selected: list[dict]) -> str:
         parts.append("dept:" + ",".join(sorted(codes["fr"])))
     if codes["it"]:
         parts.append("it:" + ",".join(sorted(codes["it"], key=list(zones.ITALY_NAMES).index)))
+    for country in ("at", "de", "es"):
+        if codes[country]:
+            parts.append(f"{country}:" + ",".join(sorted(codes[country], key=list(zones.NAMES[country]).index)))
+    if codes["ad"]:
+        parts.append("ad")
     return "+".join(parts)
 
 
@@ -480,8 +526,8 @@ class MainWindow(QMainWindow):
         self.summer.setText(tr("Été (carte de base)"))
         self.summer.setToolTip(tr("Carte topographique pour toute l'année"))
         self.winter.setText(tr("Hiver (surcouche)"))
-        self.winter.setToolTip(tr("Pentes, itinéraires de ski et de raquettes, zones de tranquillité :\n"
-                                  "surcouche transparente à afficher par-dessus la carte de base"))
+        self.winter.setToolTip(tr("Pentes, itinéraires de ski et de raquettes, zones de tranquillité (Suisse), "
+                                  "réserves naturelles :\nsurcouche transparente à afficher par-dessus la carte de base"))
         self.lang.setToolTip(tr("Langue de la fenêtre et des étiquettes de la carte"))
         self.dem.setText(tr("Ombrage du relief"))
         self.output_dir.edit.setPlaceholderText(tr("dans le dossier des données"))
@@ -550,9 +596,11 @@ class MainWindow(QMainWindow):
         # The neighbours' data must include every selected zone
         selected = self.map.selected()
         depts = dict.fromkeys(config.FRANCE_DEPTS + [z["code"] for z in selected if z["country"] == "fr"])
-        italy = dict.fromkeys(config.ITALY_ZONES + [z["code"] for z in selected if z["country"] == "it"])
         env.insert("FRANCE_DEPTS", ",".join(depts))
-        env.insert("ITALY_ZONES", ",".join(italy))
+        for country, var in (("it", "ITALY_ZONES"), ("at", "AUSTRIA_ZONES"), ("de", "GERMANY_ZONES"),
+                             ("es", "SPAIN_ZONES"), ("ad", "ANDORRA_ZONES")):
+            codes = dict.fromkeys(config.OSM_ZONES[country] + [z["code"] for z in selected if z["country"] == country])
+            env.insert(var, ",".join(codes))
         return env
 
     def start(self):

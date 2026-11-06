@@ -136,7 +136,7 @@ WINTER = [
     Cat("wildlife_edge_binding", "line", 0x05, 19, line("#D00000", 2), name=None),
     Cat("wildlife_edge_advised", "line", 0x06, 19, dashed("#E07000", 2, 6, 3), name=None),
     Cat("wildlife_route", "line", 0x0B, 21, dashed("#00A040", 2, 3, 2)),
-    # French and Italian nature reserves and protected areas (rules vary: check them before the trip)
+    # Nature reserves and protected areas outside Switzerland (rules vary: check them before the trip)
     Cat("nature_reserve", "polygon", 0x07, 19, pattern("#2E8B57", HATCH_DIAG_SPARSE), order=5),
     Cat("nature_reserve_edge", "line", 0x0D, 19, dashed("#2E8B57", 2, 6, 3), name=None),
     # Routes (Swisstopo snow sports map colours)
@@ -148,7 +148,9 @@ WINTER = [
     Cat("ski_down", "line", 0x08, 19, bitmap_line(SKI, ["--------x--x----", "---------x--x---", "xxxxxxxxxxxxxxxx", "---------x--x---", "--------x--x----"]), name=None),
     Cat("snowshoe", "line", 0x09, 19, dashed("#C2007A", 2, 7, 2), name=None),
     Cat("snowshoe_route_label", "line", 0x0A, 21, line("#C2007A", 1)),
-    # Camptocamp ski touring routes (France, Italy): track when available, otherwise a point
+    # Ski touring routes outside Switzerland: OpenStreetMap, and Camptocamp (track when
+    # available, otherwise a point)
+    Cat("ski_osm", "line", 0x0E, 19, dashed(SKI, 2, 3, 3)),
     Cat("ski_c2c", "line", 0x0C, 19, dashed(SKI, 2, 6, 2)),
     Cat("ski_c2c_point", "point", 0x6610, 20,
         icon(["..x..", ".xxx.", "xxxxx", ".xxx.", "..x.."], {"x": SKI}), extra=["FontStyle=SmallFont"]),
@@ -207,8 +209,9 @@ LABELS = {  # key: (fr, de, it, en)
     "wildlife_edge_binding": ("Limite zone faune", "Grenze Wildschutzgebiet", "Limite zona fauna", "Wildlife zone boundary"),
     "wildlife_edge_advised": ("Limite zone faune (rec.)", "Grenze Wildschutzgebiet (empf.)", "Limite zona fauna (racc.)", "Wildlife zone boundary (advised)"),
     "wildlife_route": ("Itinéraire autorisé (zone faune)", "Erlaubte Route (Wildschutz)", "Itinerario autorizzato (fauna)", "Allowed route (wildlife zone)"),
-    "nature_reserve": ("Réserve / protection (FR/IT)", "Schutzgebiet (FR/IT)", "Riserva / protezione (FR/IT)", "Nature reserve (FR/IT)"),
-    "nature_reserve_edge": ("Limite réserve (FR/IT)", "Grenze Schutzgebiet (FR/IT)", "Limite riserva (FR/IT)", "Nature reserve boundary (FR/IT)"),
+    "nature_reserve": ("Réserve / protection (hors CH)", "Schutzgebiet (ausser CH)", "Riserva / protezione (fuori CH)", "Nature reserve (outside CH)"),
+    "nature_reserve_edge": ("Limite réserve (hors CH)", "Grenze Schutzgebiet (ausser CH)", "Limite riserva (fuori CH)", "Nature reserve boundary (outside CH)"),
+    "ski_osm": ("Itinéraire ski OpenStreetMap", "Skitour OpenStreetMap", "Itinerario sci OpenStreetMap", "OpenStreetMap ski route"),
     "ski_c2c": ("Itinéraire ski Camptocamp", "Skitour Camptocamp", "Itinerario sci Camptocamp", "Camptocamp ski route"),
     "ski_c2c_point": ("Course ski Camptocamp", "Skitour Camptocamp (Punkt)", "Gita sci Camptocamp", "Camptocamp ski tour"),
     "ski_route_label": ("Itinéraire ski", "Skitour", "Itinerario sci", "Ski route"),

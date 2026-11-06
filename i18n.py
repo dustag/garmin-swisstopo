@@ -16,6 +16,7 @@ TEXTS = {
     "Toute la Suisse": {"de": "Ganze Schweiz", "it": "Tutta la Svizzera", "en": "All of Switzerland"},
     "Tout désélectionner": {"de": "Auswahl aufheben", "it": "Deseleziona tutto", "en": "Clear selection"},
     "Recentrer": {"de": "Zentrieren", "it": "Ricentra", "en": "Recenter"},
+    "Pyrénées": {"de": "Pyrenäen", "it": "Pirenei", "en": "Pyrenees"},
     "Aucune zone sélectionnée.": {"de": "Kein Gebiet ausgewählt.", "it": "Nessuna zona selezionata.",
                                   "en": "No area selected."},
     "Surface : <b>{area} km²</b>": {"de": "Fläche: <b>{area} km²</b>", "it": "Superficie: <b>{area} km²</b>",
@@ -40,13 +41,13 @@ TEXTS = {
                                                "en": "Topographic map for the whole year"},
     "Hiver (surcouche)": {"de": "Winter (Überlagerung)", "it": "Inverno (sovrapposizione)",
                           "en": "Winter (overlay)"},
-    "Pentes, itinéraires de ski et de raquettes, zones de tranquillité :\n"
+    "Pentes, itinéraires de ski et de raquettes, zones de tranquillité (Suisse), réserves naturelles :\n"
     "surcouche transparente à afficher par-dessus la carte de base": {
-        "de": "Hangneigungen, Skitouren- und Schneeschuhrouten, Wildruhezonen:\n"
+        "de": "Hangneigungen, Skitouren- und Schneeschuhrouten, Wildruhezonen (Schweiz), Schutzgebiete:\n"
               "transparente Überlagerung, die über der Grundkarte angezeigt wird",
-        "it": "Pendenze, itinerari di sci e racchette, zone di tranquillità:\n"
+        "it": "Pendenze, itinerari di sci e racchette, zone di tranquillità (Svizzera), riserve naturali:\n"
               "sovrapposizione trasparente da mostrare sopra la carta di base",
-        "en": "Slopes, ski touring and snowshoe routes, wildlife quiet zones:\n"
+        "en": "Slopes, ski touring and snowshoe routes, wildlife quiet zones (Switzerland), nature reserves:\n"
               "transparent overlay shown on top of the base map"},
     "Langue": {"de": "Sprache", "it": "Lingua", "en": "Language"},
     "Langue de la fenêtre et des étiquettes de la carte": {"de": "Sprache des Fensters und der Kartenbeschriftung",

@@ -43,7 +43,10 @@ class Tile:
 
     def map_id(self, layer: int):
         """8-digit Garmin map id; layer 0 = base, 1 = winter overlay."""
-        index = ((self.e - E_ORIGIN) // config.TILE_SIZE) * N_ROWS + (self.n - N_ORIGIN) // config.TILE_SIZE
+        row = (self.n - N_ORIGIN) // config.TILE_SIZE
+        if not -N_ROWS // 2 <= row < N_ROWS // 2:
+            raise ValueError(f"tile {self.name} is too far north or south of the grid origin")
+        index = ((self.e - E_ORIGIN) // config.TILE_SIZE) * N_ROWS + row
         return 65200000 + 2 * index + layer
 
 
@@ -156,10 +159,68 @@ def italy_zone_code(code: str, what: str) -> int:
     return int((config.ITALY_DIR / code / what).read_text())
 
 
+def _gisco(dataset: str, filename: str):
+    """GISCO (Eurostat) boundary file, downloaded once, in LV95."""
+    path = config.DOWNLOAD_DIR / "gisco" / filename
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        req = urllib.request.Request(f"{config.GISCO}/{dataset}/geojson/{filename}",
+                                     headers={"User-Agent": config.USER_AGENT})
+        with urllib.request.urlopen(req, timeout=600) as r, open(path.with_suffix(".part"), "wb") as f:
+            shutil.copyfileobj(r, f)
+        path.with_suffix(".part").replace(path)
+    return pyogrio.read_dataframe(path).to_crs(2056)
+
+
+def nuts_zone(country: str, code: str):
+    """Outline in LV95 (cached) of a NUTS 3 region (e.g. AT332), or of a whole country
+    when the code is a country code (AD)."""
+    cache = config.DOWNLOAD_DIR / country / code / "outline.wkb"
+    if cache.exists():
+        return shapely.from_wkb(cache.read_bytes())
+    if len(code) == 2:
+        df = _gisco("countries", "CNTR_RG_01M_2024_4326.geojson")
+        df = df[df.CNTR_ID == code]
+    else:
+        df = _gisco("nuts", "NUTS_RG_01M_2024_4326_LEVL_3.geojson")
+        df = df[df.NUTS_ID == code]
+    if df.empty:
+        raise ValueError(f"unknown zone {code!r}: use a NUTS 3 code (e.g. AT332) or a country code (AD)")
+    geom = shapely.make_valid(shapely.union_all(df.geometry.values))
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(shapely.to_wkb(geom))
+    return geom
+
+
+def _osm_country(country: str, arg: str) -> Coverage:
+    """Coverage of zones of a country mapped from OpenStreetMap (all its configured zones
+    when no code is given)."""
+    import countries
+    configured = config.OSM_ZONES[country]
+    codes = [c.strip().upper() for c in arg.split(",")] if arg else configured
+    geom = shapely.union_all([countries.Zone(country, c).outline() for c in codes])
+    if country == "it":
+        prov = 99 if codes[0] == "GP" else italy_zone_code(codes[0], "province") % 100
+        fid = config.ITALY_FAMILY_ID + 2 * prov
+    else:
+        fid = config.OSM_FAMILY_ID + 2 * (zlib.crc32(",".join(codes).encode()) % 1000)
+    if set(codes) == set(configured):
+        name = country
+    elif country == "it":
+        name = "it" + "-".join(codes).lower()
+    else:
+        name = "-".join(codes).lower()
+    return Coverage(name, fid, tiles_for(geom))
+
+
 def resolve(spec: str) -> Coverage:
     """Coverage from a spec: area name, "switzerland", "canton:VS,VD", "dept:74,73",
-    "it:AO,GP" (or "it" for config.ITALY_ZONES), "bbox:E0,N0,E1,N1", or several of
-    them joined with "+"."""
+    "it:AO,GP", "at:AT332", "de:DE27E", "es:ES241", "ad" (or "it", "at"... for all the
+    configured zones of a country), "bbox:E0,N0,E1,N1", an alias of config.ALIASES, or
+    several of them joined with "+"."""
+    if spec in config.ALIASES:
+        cov = resolve(config.ALIASES[spec])
+        return Coverage(spec, cov.family_id, cov.tiles)
     if "+" in spec:
         parts = [resolve(p) for p in spec.split("+")]
         tiles = sorted({t for c in parts for t in c.tiles}, key=lambda t: (t.e, t.n))
@@ -185,13 +246,11 @@ def resolve(spec: str) -> Coverage:
         geom = shapely.union_all([department(c) for c in codes])
         fid = config.DEPT_FAMILY_ID + 2 * int(codes[0])
         return Coverage("fr" + "-".join(codes), fid, tiles_for(geom))
-    if kind == "it" or spec == "it":
-        codes = [c.strip().upper() for c in arg.split(",")] if arg else config.ITALY_ZONES
-        geom = shapely.union_all([italy_zone(c) for c in codes])
-        prov = 99 if codes[0] == "GP" else italy_zone_code(codes[0], "province") % 100
-        return Coverage("it" + "-".join(codes).lower(), config.ITALY_FAMILY_ID + 2 * prov, tiles_for(geom))
+    if kind in config.OSM_ZONES:
+        return _osm_country(kind, arg)
     if kind == "bbox":
         bbox = [float(v) for v in arg.split(",")]
         return Coverage("custom", config.CUSTOM_BBOX_FAMILY_ID, tiles_for(shapely.box(*bbox)))
     raise ValueError(f"unknown coverage {spec!r}: use an area ({', '.join(config.AREAS)}), "
-                     "switzerland, canton:XX, dept:NN, it[:XX] or bbox:E0,N0,E1,N1, joined with + if needed")
+                     "switzerland, canton:XX, dept:NN, it[:XX], at[:XX], de[:XX], es[:XX], ad, bbox:E0,N0,E1,N1 "
+                     f"or an alias ({', '.join(config.ALIASES)}), joined with + if needed")

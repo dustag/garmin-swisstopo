@@ -18,7 +18,14 @@ ALTI_DIR = DOWNLOAD_DIR / "alti3d_5m"     # swissALTI3D resampled to 5 m, one fi
 FRANCE_DIR = DOWNLOAD_DIR / "fr"          # French data, one sub-directory per department
 ALTI_FR_DIR = DOWNLOAD_DIR / "rgealti_5m"  # RGE ALTI reprojected to LV95, 5 m, one file per km2
 ITALY_DIR = DOWNLOAD_DIR / "it"           # Italian data, one sub-directory per zone
-ALTI_IT_DIR = DOWNLOAD_DIR / "tinitaly_5m"  # TINITALY reprojected to LV95, 5 m, one file per km2
+# Terrain outside Switzerland and France, reprojected to LV95, 5 m, one file per km2
+ALTI_IT_DIR = DOWNLOAD_DIR / "tinitaly_5m"   # Italy, TINITALY 10 m
+ALTI_AT_DIR = DOWNLOAD_DIR / "dgm_at_5m"     # Austria, DGM Österreich 10 m
+ALTI_DE_DIR = DOWNLOAD_DIR / "dgm_by_5m"     # Bavaria, DGM1
+ALTI_ES_DIR = DOWNLOAD_DIR / "mdt_es_5m"     # Spain, IGN MDT 5 m
+ALTI_COP_DIR = DOWNLOAD_DIR / "copdem_5m"    # elsewhere (Andorra), Copernicus GLO-30
+# Priority order of the terrain models: a cell takes the first one with data
+ALTI_DIRS = [ALTI_DIR, ALTI_FR_DIR, ALTI_IT_DIR, ALTI_AT_DIR, ALTI_DE_DIR, ALTI_ES_DIR, ALTI_COP_DIR]
 WORK_DIR = DATA_DIR / "work"
 TILES_DIR = WORK_DIR / "tiles"             # per-tile intermediates, shared by all coverages
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", DATA_DIR / "output")).expanduser()
@@ -30,8 +37,10 @@ JAVA = os.environ.get("JAVA_EXE") or (str(_BUNDLED_JAVA) if _BUNDLED_JAVA.exists
 JAVA_MAX_HEAP = os.environ.get("JAVA_MAX_HEAP", "4g")
 
 # Coverage to build: an area name, "switzerland", "canton:VS[,VD...]", "dept:74[,73...]"
-# (French departments), "it:AO[,GP...]" (Italian zones), "it" (all ITALY_ZONES) or "bbox:E0,N0,E1,N1" (LV95 metres); several can be
-# combined with "+", e.g. "canton:VS+dept:74". Can be overridden with --coverage.
+# (French departments), "it:AO[,GP...]", "at:AT332[,...]", "de:DE27E[,...]", "es:ES241[,...]"
+# (zones of ITALY_ZONES, AUSTRIA_ZONES...), "it", "at", "de", "es", "ad" (all the zones of a
+# country), "bbox:E0,N0,E1,N1" (LV95 metres) or an alias of ALIASES; several can be combined
+# with "+", e.g. "canton:VS+dept:74". Can be overridden with --coverage.
 COVERAGE = os.environ.get("COVERAGE", "telliers")
 
 # Maps are cut into square tiles of a fixed LV95 grid. Each tile is built once
@@ -57,6 +66,9 @@ CANTON_FAMILY_ID = 6600
 DEPT_FAMILY_ID = 6700
 # Italian zones: family id = 6800 + 2 * (ISTAT province code % 100); GP uses 99
 ITALY_FAMILY_ID = 6800
+# Austrian, German, Spanish and Andorran zones: family id = 9000 + 2 * (stable hash of the
+# zone codes % 1000)
+OSM_FAMILY_ID = 9000
 # Combined coverages ("a+b"): family id = 7000 + 2 * (stable hash of the spec % 1000)
 COMBINED_FAMILY_ID = 7000
 FAMILY_NAME = "Swisstopo"
@@ -68,7 +80,7 @@ if LANG not in ("fr", "de", "it", "en"):
 
 # French departments whose data is used. Switzerland always has priority: French
 # data only fills the parts of a tile outside Switzerland.
-FRANCE_DEPTS = [d.strip() for d in os.environ.get("FRANCE_DEPTS", "74").split(",") if d.strip()]
+FRANCE_DEPTS = [d.strip() for d in os.environ.get("FRANCE_DEPTS", "74,64,65,31,09,66").split(",") if d.strip()]
 
 # Italian zones whose data is used: provinces by their ISTAT abbreviation (AO, VB...)
 # or GP, the Piedmont side of the Gran Paradiso (its municipalities in the province
@@ -78,12 +90,39 @@ ITALY_ZONES = [z.strip().upper() for z in os.environ.get("ITALY_ZONES", "AO,VB,V
                if z.strip()]
 GRAN_PARADISO = ["Ceresole Reale", "Locana", "Noasca", "Ribordone", "Ronco Canavese", "Valprato Soana"]
 
+
+def _zones(var, default):
+    return [z.strip().upper() for z in os.environ.get(var, default).split(",") if z.strip()]
+
+
+# Austrian, German and Spanish zones, by their NUTS 3 code (Eurostat), and Andorra (AD).
+# The defaults cover the Austrian Alps, the Allgäu and the Spanish Pyrenees.
+AUSTRIA_ZONES = _zones("AUSTRIA_ZONES", "AT341,AT342,AT331,AT332,AT333,AT334,AT335,AT321,AT322,AT323,"
+                                        "AT211,AT212,AT213,AT222,AT223,AT226,AT315,AT121,AT122")
+GERMANY_ZONES = _zones("GERMANY_ZONES", "DE27E,DE27A,DE273")
+SPAIN_ZONES = _zones("SPAIN_ZONES", "ES220,ES241,ES513,ES512")
+ANDORRA_ZONES = _zones("ANDORRA_ZONES", "AD")
+# Countries mapped from OpenStreetMap, in priority order (after Switzerland and France)
+OSM_ZONES = {"it": ITALY_ZONES, "at": AUSTRIA_ZONES, "de": GERMANY_ZONES, "es": SPAIN_ZONES, "ad": ANDORRA_ZONES}
+
+# Coverage aliases. The Alps and the Pyrenees do not share any tile: both maps can be
+# installed together.
+ALIASES = {
+    "alpes": "switzerland+dept:74+it+at+de",
+    "pyrenees": "dept:64,65,31,09,66+es+ad",
+}
+
 STAC = "https://data.geo.admin.ch/api/stac/v0.9"
 IGN_DOWNLOAD = "https://data.geopf.fr/telechargement"
 GEO_API_GOUV = "https://geo.api.gouv.fr"
 ISTAT_BOUNDARIES = "https://www.istat.it/storage/cartografia/confini_amministrativi/generalizzati/2025/Limiti01012025_g.zip"
 TINITALY = "https://tinitaly.pi.ingv.it/data_1.1"
-GEOFABRIK = "https://download.geofabrik.de/europe/italy"
+GEOFABRIK = "https://download.geofabrik.de"
+GISCO = "https://gisco-services.ec.europa.eu/distribution/v2"
+AUSTRIA_DGM = "https://gis.ktn.gv.at/OGD/Geographie_Planung/ogd-10m-at.zip"
+BAVARIA_DGM1 = "https://download1.bayernwolke.de/a/dgm/dgm1"
+SPAIN_MDT_WCS = "https://servicios.idee.es/wcs-inspire/mdt"
+COPERNICUS_DEM = "https://copernicus-dem-30m.s3.amazonaws.com"
 OVERPASS = "https://overpass-api.de/api/interpreter"
 CAMPTOCAMP_API = "https://api.camptocamp.org"
 USER_AGENT = "swisstopo-garmin (https://github.com/dustag/garmin-swisstopo)"

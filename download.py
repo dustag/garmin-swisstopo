@@ -1,7 +1,8 @@
-"""Download Swisstopo datasets and the mkgmap tool (resumable).
+"""Download the data of a coverage and the mkgmap tool (resumable).
 
     python download.py                         # coverage from .env
     python download.py --coverage canton:VS
+    python download.py --coverage pyrenees
 
 swissALTI3D tiles (2 m) are resampled to 5 m right after download and the
 originals deleted: all of Switzerland takes ~40 GB at 2 m, a few GB at 5 m.
@@ -16,19 +17,17 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import numpy as np
-import rasterio
 from pyproj import Transformer
-from rasterio.enums import Resampling
 
 import shapely
 
 import config
+import countries
 import coverage
+import demsrc
 import france
-import italy
+import osmzone
 
-ALTI_RES = 5  # m
 LEGACY_2M_DIR = config.DOWNLOAD_DIR / "alti3d"   # 2 m tiles kept by earlier versions
 
 
@@ -96,20 +95,6 @@ def alti3d_urls(cov: coverage.Coverage, keys):
     return {key: href for key, (_, href) in latest.items()}
 
 
-def to_5m(src: Path, dest: Path):
-    """Average a 2 m tile down to 5 m (200 x 200 px per km2)."""
-    with rasterio.open(src) as r:
-        size = int(round(r.width * r.res[0] / ALTI_RES))
-        z = r.read(1, out_shape=(size, size), resampling=Resampling.average, masked=True)
-        profile = dict(driver="GTiff", width=size, height=size, count=1, dtype="float32", crs=r.crs,
-                       transform=r.transform * r.transform.scale(r.width / size, r.height / size),
-                       nodata=-9999, compress="deflate", predictor=3)
-    tmp = dest.with_suffix(".tmp.tif")
-    with rasterio.open(tmp, "w", **profile) as w:
-        w.write(np.ma.filled(z.astype("float32"), -9999), 1)
-    tmp.replace(dest)
-
-
 def get_alti(key, href):
     dest = config.ALTI_DIR / f"{key}.tif"
     if dest.exists():
@@ -123,49 +108,54 @@ def get_alti(key, href):
             if attempt == 3:
                 raise
             time.sleep(10 * (attempt + 1))
-    to_5m(src, dest)
+    demsrc.to_5m(src, dest)
     src.unlink()
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--coverage", default=config.COVERAGE,
-                    help="area name, switzerland, canton:XX[,YY], dept:NN, it[:XX] or bbox:E0,N0,E1,N1")
+                    help="area, switzerland, canton:XX[,YY], dept:NN, it/at/de/es[:XX], ad, bbox:E0,N0,E1,N1 "
+                         "or alias (alpes, pyrenees)")
     ap.add_argument("--jobs", type=int, default=8, help="parallel downloads")
     args = ap.parse_args()
 
     cov = coverage.resolve(args.coverage)
-    keys = needed_km_tiles(cov)
-    config.ALTI_DIR.mkdir(parents=True, exist_ok=True)
-    todo = {k: h for k, h in alti3d_urls(cov, keys).items() if not (config.ALTI_DIR / f"{k}.tif").exists()}
-    print(f"Coverage {cov.name}: {len(cov.tiles)} tiles, swissALTI3D {len(todo)} km2 to fetch")
-    with ThreadPoolExecutor(args.jobs) as pool:
-        for i, _ in enumerate(pool.map(lambda kv: get_alti(*kv), todo.items()), 1):
-            if i % 50 == 0 or i == len(todo):
-                print(f"\r  {i} / {len(todo)}", end="", flush=True)
-    if todo:
-        print()
+    tiles = shapely.union_all([shapely.box(*t.bounds) for t in cov.tiles])
+    print(f"Coverage {cov.name}: {len(cov.tiles)} tiles")
+    # Swiss data, only when the coverage touches Switzerland
+    if coverage.switzerland().intersects(tiles):
+        keys = needed_km_tiles(cov)
+        config.ALTI_DIR.mkdir(parents=True, exist_ok=True)
+        todo = {k: h for k, h in alti3d_urls(cov, keys).items() if not (config.ALTI_DIR / f"{k}.tif").exists()}
+        print(f"swissALTI3D: {len(todo)} km2 to fetch")
+        with ThreadPoolExecutor(args.jobs) as pool:
+            for i, _ in enumerate(pool.map(lambda kv: get_alti(*kv), todo.items()), 1):
+                if i % 50 == 0 or i == len(todo):
+                    print(f"\r  {i} / {len(todo)}", end="", flush=True)
+        if todo:
+            print()
 
-    for key in ["skitouren", "schneeschuh", "tlm3d"]:
-        url = config.SOURCES[key]
-        archive = config.DOWNLOAD_DIR / Path(url).name
-        if archive.with_suffix("").exists():   # already extracted (the archive may have been deleted)
-            continue
-        print(f"{key}: {url}")
-        unzip(fetch(url, archive))
+        for key in ["skitouren", "schneeschuh", "tlm3d"]:
+            url = config.SOURCES[key]
+            archive = config.DOWNLOAD_DIR / Path(url).name
+            if archive.with_suffix("").exists():   # already extracted (the archive may have been deleted)
+                continue
+            print(f"{key}: {url}")
+            unzip(fetch(url, archive))
 
     # French departments touching the coverage
-    tiles = shapely.union_all([shapely.box(*t.bounds) for t in cov.tiles])
     for code in config.FRANCE_DEPTS:
         if coverage.department(code).intersects(tiles) and not france.is_ready(code):
             print(f"France, department {code}:")
             france.download_dept(code, fetch)
 
-    # Italian zones touching the coverage
-    zones = [c for c in config.ITALY_ZONES if italy.zone_area(c).intersects(tiles) and not italy.is_ready(c)]
+    # Zones mapped from OpenStreetMap (Italy, Austria...) touching the coverage
+    zones = [z for z in countries.configured() if z.area().intersects(tiles)
+             and not (z.ready and osmzone.osm_ready(z))]
     if zones:
-        print(f"Italy, zones {', '.join(zones)}:")
-        italy.download_zones(zones, fetch)
+        print(f"OpenStreetMap zones {', '.join(z.code for z in zones)}:")
+        osmzone.download_zones(zones, fetch)
 
     # Already there in the packaged application, whose folder is read-only
     if not next(config.TOOLS_DIR.glob("mkgmap-latest/mkgmap-*/mkgmap.jar"), None):

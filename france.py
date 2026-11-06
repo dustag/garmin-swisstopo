@@ -141,18 +141,23 @@ def download_rgealti(code, fetch, outline):
     marker.touch()
 
 
-def overpass(query, dest, attempts=4):
-    """Run an Overpass query into a file, retrying when the server is busy."""
+def overpass(query, dest, attempts=6):
+    """Run an Overpass query into a file, retrying when the server is busy or down."""
+    part = dest.with_suffix(".part")
     for attempt in range(attempts):
         try:
             with _get(config.OVERPASS, data=urllib.parse.urlencode({"data": query}).encode()) as r, \
-                    open(dest, "wb") as f:
+                    open(part, "wb") as f:
                 shutil.copyfileobj(r, f)
+            part.replace(dest)
             return
         except urllib.error.HTTPError as e:
             if e.code not in (429, 502, 503, 504) or attempt == attempts - 1:
                 raise
-            time.sleep(30 * (attempt + 1))
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == attempts - 1:
+                raise
+        time.sleep(60 * (attempt + 1))
 
 
 def download_osm_rock(code, outline, chunks=4):
@@ -175,14 +180,17 @@ def download_osm_rock(code, outline, chunks=4):
             bbox = f"{lat_edges[j]},{lon_edges[i]},{lat_edges[j + 1]},{lon_edges[i + 1]}"
             query = (f'[out:xml][timeout:300];(way["natural"~"^(bare_rock|scree|shingle)$"]({bbox});'
                      f'relation["natural"~"^(bare_rock|scree|shingle)$"]({bbox}););(._;>;);out body;')
+            # Pieces already fetched are kept until the end, so an interrupted run resumes
             raw = dept_dir(code) / f"osm_rock_{i}_{j}.osm"
-            overpass(query, raw)
+            if not raw.exists():
+                overpass(query, raw)
             df = pyogrio.read_dataframe(raw, layer="multipolygons", columns=["osm_id", "osm_way_id", "natural"])
             frames.append(df[df["natural"].isin(["bare_rock", "scree", "shingle"])])
-            raw.unlink()
     df = gpd.GeoDataFrame(pd.concat(frames, ignore_index=True), crs=frames[0].crs)
     df = df.drop_duplicates(subset=["osm_id", "osm_way_id"]).to_crs(LV95)
     pyogrio.write_dataframe(df, dest, layer="rock")
+    for raw in dept_dir(code).glob("osm_rock_*.osm"):
+        raw.unlink()
 
 
 def _c2c_label(doc, lang):
@@ -226,7 +234,8 @@ def download_camptocamp(d: Path, outline, what):
             shape = _geojson_2d(geom["geom"])
         if shape is not None:
             rows.append({"id": doc["document_id"], "label": _c2c_label(doc, config.LANG), "geometry": shape})
-    df = gpd.GeoDataFrame(rows, crs=3857).to_crs(LV95)
+    # Columns given explicitly: a zone may have no route at all
+    df = gpd.GeoDataFrame(rows, columns=["id", "label", "geometry"], geometry="geometry", crs=3857).to_crs(LV95)
     pyogrio.write_dataframe(df, dest, layer="routes")
 
 
