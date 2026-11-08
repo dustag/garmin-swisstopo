@@ -45,6 +45,8 @@ LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "en": "Englis
 # with Austria and the Allgäu (0.92 + 0.87 MB) maps
 MB_PER_TILE = {"base": 0.95, "hiver": 0.85}
 MAP_NAMES = {"base": "été", "hiver": "hiver"}
+# Regions with a selection button (texts translated in i18n.py)
+REGION_BUTTONS = {"jura": "Jura", "alpes-ouest": "Alpes occidentales", "alpes-est": "Alpes orientales"}
 PROGRESS = re.compile(r"\[?(\d+)\s*/\s*(\d+)\]?")
 
 
@@ -386,20 +388,29 @@ class MainWindow(QMainWindow):
         # Zones
         self.help = QLabel(wordWrap=True)
         self.summary = QLabel(wordWrap=True)
-        self.whole = QPushButton()
-        self.whole.clicked.connect(lambda: self.map.set_selected({("ch", c) for c in config.CANTONS}))
+        # One button per region (config.REGIONS): adds its zones to the selection
+        self.region_buttons = {}
+        for region in REGION_BUTTONS:
+            b = QPushButton()
+            b.clicked.connect(lambda _=False, r=region: self.map.set_selected(
+                {(country, code) for country, codes in config.REGIONS[r].items() for code in codes}))
+            self.region_buttons[region] = b
         self.clear = QPushButton()
         self.clear.clicked.connect(lambda: self.map.set_selected(set(), exclusive=True))
         self.home = QPushButton()
         self.home.clicked.connect(self.map.fit_home)
         buttons = QHBoxLayout()
-        for b in (self.whole, self.clear, self.home):
+        for b in self.region_buttons.values():
             buttons.addWidget(b)
+        tools = QHBoxLayout()
+        for b in (self.clear, self.home):
+            tools.addWidget(b)
         self.zone_box = QGroupBox()
         zone_layout = QVBoxLayout(self.zone_box)
         zone_layout.addWidget(self.help)
         zone_layout.addWidget(self.summary)
         zone_layout.addLayout(buttons)
+        zone_layout.addLayout(tools)
 
         # Options
         self.lang = QComboBox()
@@ -525,7 +536,8 @@ class MainWindow(QMainWindow):
         self.zone_box.setTitle(tr("Zones"))
         self.help.setText(tr("Cliquez sur la carte pour choisir les zones. "
                              "Molette pour zoomer, glisser pour se déplacer."))
-        self.whole.setText(tr("Toute la Suisse"))
+        for region, label in REGION_BUTTONS.items():
+            self.region_buttons[region].setText(tr(label))
         self.clear.setText(tr("Tout désélectionner"))
         self.home.setText(tr("Recentrer"))
         self.options.setTitle(tr("Options"))
