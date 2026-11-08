@@ -21,6 +21,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tile; the default zones of each country are those of the regions.
 - Configuration window: **Jura**, **Alpes occidentales** and **Alpes orientales** buttons; a selection made
   of exactly one region is built as that region.
+- Configuration window: a coarse shaded relief under the zones (Copernicus GLO-90, `relief_*.png`).
 
 ### Changed
 

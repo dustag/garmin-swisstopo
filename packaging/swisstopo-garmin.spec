@@ -13,7 +13,8 @@ a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
     pathex=[str(ROOT)],
     # GDAL and PROJ data of the wheels (osmconf.ini for the Italian OpenStreetMap extracts...)
-    datas=[(str(ROOT / "zones.json"), ".")] + collect_data_files("pyogrio") + collect_data_files("rasterio"),
+    datas=[(str(ROOT / f), ".") for f in ("zones.json", "relief.json", "relief_alps.png", "relief_pyrenees.png")]
+          + collect_data_files("pyogrio") + collect_data_files("rasterio"),
     # Started by name from launcher.py; compiled modules imported from other compiled modules
     hiddenimports=["gui", "download", "build"] + collect_submodules("pyogrio") + collect_submodules("rasterio"),
     excludes=["tkinter", "matplotlib", "IPython", "pytest"],

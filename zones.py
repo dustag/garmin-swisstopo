@@ -1,25 +1,36 @@
-"""Selectable zones of the configuration window (gui.py): simplified outlines and names.
+"""Selectable zones of the configuration window (gui.py): simplified outlines and names,
+and a coarse shaded relief drawn under them.
 
-    python zones.py      # regenerate zones.json from the official boundaries
+    python zones.py            # regenerate zones.json and the relief from the official data
+    python zones.py --relief   # regenerate only the relief (relief.json, relief_*.png)
 
-zones.json is kept in the repository, so that the window starts offline and fast.
-Coordinates are LV95 metres, rounded to 10 m; outlines are simplified to ~150 m,
+zones.json and the relief are kept in the repository, so that the window starts offline
+and fast. Coordinates are LV95 metres, rounded to 10 m; outlines are simplified to ~150 m,
 which is plenty to pick a zone but must not be used to cut the map data.
 
 The Pyrenees are drawn as an inset next to the Alps: their zones carry an "offset"
 (LV95 metres) that the window adds when drawing, the outlines keeping their true place.
 """
 import json
+import math
+import sys
 from pathlib import Path
 
+import numpy as np
 import shapely
 from shapely.ops import polylabel
 
 import config
 import coverage
 
-ZONES_FILE = Path(__file__).resolve().parent / "zones.json"
+REPO = Path(__file__).resolve().parent
+ZONES_FILE = REPO / "zones.json"
+RELIEF_FILE = REPO / "relief.json"
 SIMPLIFY = 150  # m
+# Shaded relief: Copernicus GLO-90, read from its overviews at about RELIEF_RES
+COPERNICUS_90 = "https://copernicus-dem-90m.s3.amazonaws.com"
+RELIEF_RES = 500   # m per pixel
+RELIEF_MARGIN = 20_000  # m around the zones
 
 # Names in fr, de, it, en
 CANTON_NAMES = {
@@ -189,6 +200,88 @@ def make():
         z["offset"] = offset
     ZONES_FILE.write_text(json.dumps(zones, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"{len(zones)} zones -> {ZONES_FILE} ({ZONES_FILE.stat().st_size / 1e3:.0f} kB)")
+    make_relief(zones)
+
+
+def make_relief(zones=None):
+    """Shaded relief under the Alps and under the Pyrenees inset (relief.json, relief_*.png)."""
+    zones = zones or load()
+    parts = {"alps": [z for z in zones if "offset" not in z], "pyrenees": [z for z in zones if "offset" in z]}
+    meta = []
+    for name, part in parts.items():
+        if not part:
+            continue
+        e0, n0, e1, n1 = _bounds(part)
+        bounds = [math.floor((e0 - RELIEF_MARGIN) / RELIEF_RES) * RELIEF_RES,
+                  math.floor((n0 - RELIEF_MARGIN) / RELIEF_RES) * RELIEF_RES,
+                  math.ceil((e1 + RELIEF_MARGIN) / RELIEF_RES) * RELIEF_RES,
+                  math.ceil((n1 + RELIEF_MARGIN) / RELIEF_RES) * RELIEF_RES]
+        path = REPO / f"relief_{name}.png"
+        _shaded_relief(bounds, path)
+        meta.append({"file": path.name, "bounds": bounds, "res": RELIEF_RES, "offset": part[0].get("offset", [0, 0])})
+        print(f"relief {name} -> {path} ({path.stat().st_size / 1e3:.0f} kB)")
+    RELIEF_FILE.write_text(json.dumps(meta), encoding="utf-8")
+
+
+def _shaded_relief(bounds, path):
+    """Shading of an LV95 box as a transparent PNG: shadows in black, lit slopes in white,
+    so that it shows on a light or a dark background."""
+    import warnings
+
+    import rasterio
+    from pyproj import Transformer
+    from rasterio.enums import Resampling
+    from rasterio.transform import from_origin
+    from rasterio.warp import reproject
+
+    e0, n0, e1, n1 = bounds
+    width, height = int((e1 - e0) / RELIEF_RES), int((n1 - n0) / RELIEF_RES)
+    dst_transform = from_origin(e0, n1, RELIEF_RES, RELIEF_RES)
+    z = np.full((height, width), np.nan, "float32")
+    xs, ys = np.meshgrid(np.linspace(e0, e1, 20), np.linspace(n0, n1, 20))
+    lon, lat = Transformer.from_crs(2056, 4326, always_xy=True).transform(xs.ravel(), ys.ravel())
+    for la in range(math.floor(min(lat)), math.floor(max(lat)) + 1):
+        for lo in range(math.floor(min(lon)), math.floor(max(lon)) + 1):
+            name = (f"Copernicus_DSM_COG_30_{'N' if la >= 0 else 'S'}{abs(la):02d}_00_"
+                    f"{'E' if lo >= 0 else 'W'}{abs(lo):03d}_00_DEM")
+            try:
+                with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR"), \
+                        rasterio.open(f"/vsicurl/{COPERNICUS_90}/{name}/{name}.tif") as r:
+                    # A decimated read uses the overviews: a few hundred kB per tile
+                    f = max(1, round(RELIEF_RES / 90 / 2))
+                    data = r.read(1, out_shape=(r.height // f, r.width // f), resampling=Resampling.average)
+                    src_transform = r.transform * r.transform.scale(r.width / data.shape[1], r.height / data.shape[0])
+            except rasterio.errors.RasterioIOError:
+                continue   # sea
+            part = np.full_like(z, np.nan)
+            reproject(data.astype("float32"), part, src_transform=src_transform, src_crs="EPSG:4326",
+                      dst_transform=dst_transform, dst_crs="EPSG:2056", dst_nodata=np.nan,
+                      resampling=Resampling.bilinear)
+            z = np.where(np.isnan(z), part, z)
+            print(f"  {name}", flush=True)
+    land = ~np.isnan(z) & (np.nan_to_num(z) > 0)
+    z = np.nan_to_num(z)
+    # Hill shading, light from the north-west, slopes exaggerated for a 500 m grid
+    gy, gx = np.gradient(z * 2.5, RELIEF_RES)
+    slope = np.arctan(np.hypot(gx, gy))
+    aspect = np.arctan2(-gx, gy)
+    az, alt = math.radians(315), math.radians(45)
+    shade = np.sin(alt) * np.cos(slope) + np.cos(alt) * np.sin(slope) * np.cos(az - aspect)
+    flat = math.sin(alt)
+    rgba = np.zeros((4, height, width), "uint8")
+    dark = np.clip((flat - shade) / flat, 0, 1)
+    light = np.clip((shade - flat) / (1 - flat), 0, 1)
+    rgba[0:3] = np.where(light > 0, 255, 0).astype("uint8")
+    rgba[3] = np.where(land, np.clip(dark * 150 + light * 90, 0, 255), 0).astype("uint8")
+    with warnings.catch_warnings():   # a plain image: no georeferencing on purpose
+        warnings.simplefilter("ignore", rasterio.errors.NotGeoreferencedWarning)
+        with rasterio.open(path, "w", driver="PNG", width=width, height=height, count=4, dtype="uint8") as w:
+            w.write(rgba)
+    path.with_suffix(".png.aux.xml").unlink(missing_ok=True)
+
+
+def load_relief() -> list[dict]:
+    return json.loads(RELIEF_FILE.read_text(encoding="utf-8")) if RELIEF_FILE.exists() else []
 
 
 def _bounds(zone_list):
@@ -206,4 +299,4 @@ def name(zone: dict, lang: str) -> str:
 
 
 if __name__ == "__main__":
-    make()
+    make_relief() if "--relief" in sys.argv else make()

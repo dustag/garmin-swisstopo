@@ -20,9 +20,10 @@ from pathlib import Path
 from PySide6.QtCore import (QLibraryInfo, QLocale, QPointF, QProcess, QProcessEnvironment, QRectF, QSettings, Qt,
                             QTranslator, QUrl, Signal)
 from PySide6.QtGui import (QBrush, QColor, QDesktopServices, QFont, QFontDatabase, QFontMetricsF, QPainter,
-                           QPainterPath, QPainterPathStroker, QPen, QPolygonF)
+                           QPainterPath, QPainterPathStroker, QPen, QPixmap, QPolygonF, QTransform)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGraphicsItem,
-                               QGraphicsPathItem, QGraphicsRectItem, QGraphicsScene, QGraphicsSimpleTextItem,
+                               QGraphicsPathItem, QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsScene,
+                               QGraphicsSimpleTextItem,
                                QGraphicsView, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                                QSpinBox, QSplitter, QToolButton, QVBoxLayout, QWidget)
@@ -84,7 +85,7 @@ class ZoneItem(QGraphicsPathItem):
     def update_style(self):
         color = COUNTRY_COLORS[self.zone["country"]]
         fill = QColor(color)
-        fill.setAlpha(170 if self.selected else 90 if self.hovered else 30)
+        fill.setAlpha(120 if self.selected else 70 if self.hovered else 25)   # the relief shows through
         pen = QPen(color.darker(130), 2 if self.selected else 1)
         pen.setCosmetic(True)
         self.setPen(pen)
@@ -174,6 +175,20 @@ class MapView(QGraphicsView):
     def __init__(self, zone_list: list[dict]):
         super().__init__()
         self.setScene(QGraphicsScene(self))
+        # Coarse shaded relief under the zones (see zones.make_relief)
+        for relief in zones.load_relief():
+            pixmap = QPixmap(str(zones.REPO / relief["file"]))
+            if pixmap.isNull():
+                continue
+            item = QGraphicsPixmapItem(pixmap)
+            item.setTransformationMode(Qt.SmoothTransformation)
+            item.setTransform(QTransform.fromScale(relief["res"], relief["res"]))
+            e0, _, _, n1 = relief["bounds"]
+            dx, dy = relief["offset"]
+            item.setPos(e0 + dx, -(n1 + dy))
+            item.setZValue(-1)
+            item.setAcceptedMouseButtons(Qt.NoButton)
+            self.scene().addItem(item)
         self.items_by_key = {}
         self.labels = []
         for zone in zone_list:
@@ -191,7 +206,11 @@ class MapView(QGraphicsView):
                 rect = rect.united(r)
             self.inset = InsetFrame(rect.adjusted(-10_000, -15_000, 10_000, 10_000))
             self.scene().addItem(self.inset)
-        self.home = self.scene().itemsBoundingRect().adjusted(-5000, -5000, 5000, 5000)
+        # Home view on the zones (the relief extends a little beyond them)
+        rect = None
+        for item in list(self.items_by_key.values()) + ([self.inset] if self.inset else []):
+            rect = item.sceneBoundingRect() if rect is None else rect.united(item.sceneBoundingRect())
+        self.home = rect.adjusted(-5000, -5000, 5000, 5000)
         self.setSceneRect(self.home.adjusted(-100_000, -100_000, 100_000, 100_000))
         self.setRenderHint(QPainter.Antialiasing)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)

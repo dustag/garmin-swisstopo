@@ -143,7 +143,7 @@ flowchart LR
 | `legend.py` | Map legend: Garmin types, zoom levels, colours/patterns, translated labels; generates style and TYP |
 | `gui.py` | Configuration window: zones picked on a map, options, download and build with their log |
 | `i18n.py` | Translations of the window (texts are written in French in `gui.py`) |
-| `zones.py`, `zones.json` | Names and simplified outlines of the zones shown in the window (`python zones.py` regenerates the outlines) |
+| `zones.py`, `zones.json`, `relief*` | Names and simplified outlines of the zones shown in the window, and the shaded relief under them (`python zones.py` regenerates them, `--relief` only the relief) |
 | `osmwriter.py` | Writes shapely geometries (LV95) to OSM XML (WGS84), including multipolygons with holes |
 | `.env.example` | Template of the local configuration (copy to `.env`) |
 | `requirements.txt` | Python dependencies |
@@ -230,7 +230,8 @@ python gui.py
 
 Click the cantons, French departments and zones of the other countries to put in the map (wheel to zoom,
 drag to move), or add a whole region with the **Jura**, **Alpes occidentales** and **Alpes orientales**
-buttons; the Pyrenees are drawn in a framed inset below the Alps, not at their true distance. A selection
+buttons; a coarse shaded relief shows the mountains under the zones, and the Pyrenees are drawn in a framed
+inset below the Alps, not at their true distance. A selection
 made of exactly one region is built as that region (`alpes-ouest`…), whose map does not overlap the others.
 Then
 choose the maps (summer base map, winter overlay or both), the label language and the folders, then **Construire les cartes**: the window runs `download.py`
@@ -465,7 +466,7 @@ share them:
 | DGM Österreich 10 m (terrain in Austria) | © geoland.at / BEV | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), attribution |
 | DGM1 (terrain in Bavaria) | © Bayerische Vermessungsverwaltung (LDBV) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), attribution |
 | MDT 5 m (terrain in Spain) | © Instituto Geográfico Nacional de España | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), attribution |
-| Copernicus GLO-30 (terrain in Andorra) | © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA | [Copernicus DEM licence](https://spacedata.copernicus.eu/documents/20123/121286/CSCDA_ESA_Mission-specific+Annex_31_Oct_22.pdf), attribution |
+| Copernicus GLO-30 (terrain in Andorra), GLO-90 (relief of the window) | © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA | [Copernicus DEM licence](https://spacedata.copernicus.eu/documents/20123/121286/CSCDA_ESA_Mission-specific+Annex_31_Oct_22.pdf), attribution |
 | NUTS regions and country outlines | © EuroGeographics for the administrative boundaries (GISCO, Eurostat) | Free reuse with attribution, [Eurostat terms](https://ec.europa.eu/eurostat/web/gisco/geodata/administrative-units) |
 | Perimeter of the Alpine Convention 2025 | © Permanent Secretariat of the Alpine Convention, [doi:10.48784/VK93-8P54](https://doi.org/10.48784/VK93-8P54) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), attribution |
 | Rock and scree areas in France, map data in Italy, Austria, Germany, Spain and Andorra | © OpenStreetMap contributors | [ODbL](https://www.openstreetmap.org/copyright), attribution |
