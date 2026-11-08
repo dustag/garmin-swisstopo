@@ -146,7 +146,7 @@ def main():
 
     # French departments touching the coverage
     for code in config.FRANCE_DEPTS:
-        if coverage.department(code).intersects(tiles) and not france.is_ready(code):
+        if coverage.dept_outline(code).intersects(tiles) and not france.is_ready(code):
             print(f"France, department {code}:")
             france.download_dept(code, fetch)
 

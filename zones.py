@@ -49,8 +49,9 @@ CANTON_NAMES = {
     "NE": ("Neuchâtel", "Neuenburg", "Neuchâtel", "Neuchâtel"),
     "GE": ("Genève", "Genf", "Ginevra", "Geneva"),
     "JU": ("Jura", "Jura", "Giura", "Jura"),
+    "LI": ("Liechtenstein",) * 4,
 }
-# Departments along the Swiss border, Savoie for the Alps south of Haute-Savoie, and the Pyrenees
+# Departments of the Jura, the Alps and the Pyrenees
 DEPT_NAMES = {
     "01": ("Ain",) * 4,
     "25": ("Doubs",) * 4,
@@ -58,6 +59,13 @@ DEPT_NAMES = {
     "68": ("Haut-Rhin", "Haut-Rhin", "Alto Reno", "Haut-Rhin"),
     "73": ("Savoie", "Savoyen", "Savoia", "Savoie"),
     "74": ("Haute-Savoie", "Hochsavoyen", "Alta Savoia", "Haute-Savoie"),
+    "38": ("Isère",) * 4,
+    "05": ("Hautes-Alpes", "Hautes-Alpes", "Alte Alpi", "Hautes-Alpes"),
+    "04": ("Alpes-de-Haute-Provence", "Alpes-de-Haute-Provence", "Alpi dell'Alta Provenza", "Alpes-de-Haute-Provence"),
+    "06": ("Alpes-Maritimes", "Alpes-Maritimes", "Alpi Marittime", "Alpes-Maritimes"),
+    "26": ("Drôme",) * 4,
+    "83": ("Var",) * 4,
+    "84": ("Vaucluse",) * 4,
     "64": ("Pyrénées-Atlantiques", "Pyrénées-Atlantiques", "Pirenei Atlantici", "Pyrénées-Atlantiques"),
     "65": ("Hautes-Pyrénées", "Hautes-Pyrénées", "Alti Pirenei", "Hautes-Pyrénées"),
     "31": ("Haute-Garonne", "Haute-Garonne", "Alta Garonna", "Haute-Garonne"),
@@ -72,8 +80,24 @@ ITALY_NAMES = {
     "CO": ("Côme", "Como", "Como", "Como"),
     "SO": ("Sondrio",) * 4,
     "BZ": ("Bolzano", "Südtirol", "Bolzano", "South Tyrol"),
-    "GP": ("Grand Paradis (Piémont)", "Gran Paradiso (Piemont)", "Gran Paradiso (Piemonte)",
-           "Gran Paradiso (Piedmont)"),
+    "TO": ("Turin", "Turin", "Torino", "Turin"),
+    "CN": ("Coni", "Cuneo", "Cuneo", "Cuneo"),
+    "BI": ("Biella",) * 4,
+    "VC": ("Verceil", "Vercelli", "Vercelli", "Vercelli"),
+    "NO": ("Novare", "Novara", "Novara", "Novara"),
+    "IM": ("Imperia",) * 4,
+    "SV": ("Savone", "Savona", "Savona", "Savona"),
+    "LC": ("Lecco",) * 4,
+    "BG": ("Bergame", "Bergamo", "Bergamo", "Bergamo"),
+    "BS": ("Brescia",) * 4,
+    "TN": ("Trentin", "Trentino", "Trentino", "Trentino"),
+    "VR": ("Vérone", "Verona", "Verona", "Verona"),
+    "VI": ("Vicence", "Vicenza", "Vicenza", "Vicenza"),
+    "BL": ("Bellune", "Belluno", "Belluno", "Belluno"),
+    "TV": ("Trévise", "Treviso", "Treviso", "Treviso"),
+    "PN": ("Pordenone",) * 4,
+    "UD": ("Udine",) * 4,
+    "GO": ("Gorizia", "Görz", "Gorizia", "Gorizia"),
 }
 AUSTRIA_NAMES = {
     "AT341": ("Bludenz-Bregenzerwald",) * 4,
@@ -96,6 +120,17 @@ AUSTRIA_NAMES = {
     "AT315": ("Traunviertel",) * 4,
     "AT121": ("Mostviertel-Eisenwurzen",) * 4,
     "AT122": ("Basse-Autriche sud", "Niederösterreich-Süd", "Bassa Austria meridionale", "Southern Lower Austria"),
+    "AT123": ("Sankt Pölten",) * 4,
+    "AT126": ("Environs de Vienne nord", "Wiener Umland/Nordteil", "Dintorni di Vienna nord", "Vienna surroundings north"),
+    "AT127": ("Environs de Vienne sud", "Wiener Umland/Südteil", "Dintorni di Vienna sud", "Vienna surroundings south"),
+    "AT111": ("Burgenland central", "Mittelburgenland", "Burgenland centrale", "Central Burgenland"),
+    "AT112": ("Burgenland nord", "Nordburgenland", "Burgenland settentrionale", "Northern Burgenland"),
+    "AT113": ("Burgenland sud", "Südburgenland", "Burgenland meridionale", "Southern Burgenland"),
+    "AT221": ("Graz",) * 4,
+    "AT224": ("Styrie orientale", "Oststeiermark", "Stiria orientale", "Eastern Styria"),
+    "AT225": ("Styrie occidentale et méridionale", "West- und Südsteiermark", "Stiria occidentale e meridionale",
+              "Western and Southern Styria"),
+    "AT314": ("Steyr-Kirchdorf",) * 4,
 }
 GERMANY_NAMES = {
     "DE27E": ("Oberallgäu",) * 4,
@@ -113,7 +148,7 @@ NAMES = {"ch": CANTON_NAMES, "fr": DEPT_NAMES, "it": ITALY_NAMES, "at": AUSTRIA_
          "es": SPAIN_NAMES, "ad": ANDORRA_NAMES}
 NAME_LANGS = ("fr", "de", "it", "en")
 # Zones drawn in the Pyrenees inset
-PYRENEES = {("fr", c) for c in ("64", "65", "31", "09", "66")} | {("es", c) for c in SPAIN_NAMES} | {("ad", "AD")}
+PYRENEES = {(country, code) for country, codes in config.REGIONS["pyrenees"].items() for code in codes}
 INSET_GAP = 40_000  # m between the Alps and the inset
 
 
@@ -131,16 +166,15 @@ def _zone(country, code, geom):
 def make():
     import countries   # terrain and download modules: not needed by the window
     zones = []
-    for code in config.CANTONS:
+    for code in CANTON_NAMES:
         print(f"canton {code}")
-        geom = coverage.boundary("ch.swisstopo.swissboundaries3d-kanton-flaeche.fill", "ak", code)
-        zones.append(_zone("ch", code, geom))
+        zones.append(_zone("ch", code, coverage.canton(code)))
     for code in DEPT_NAMES:
         print(f"department {code}")
-        zones.append(_zone("fr", code, coverage.department(code)))
+        zones.append(_zone("fr", code, coverage.dept_outline(code)))
     for code in ITALY_NAMES:
         print(f"Italian zone {code}")
-        zones.append(_zone("it", code, coverage.italy_zone(code)))
+        zones.append(_zone("it", code, countries.Zone("it", code).outline()))
     for country, names in (("at", AUSTRIA_NAMES), ("de", GERMANY_NAMES), ("es", SPAIN_NAMES), ("ad", ANDORRA_NAMES)):
         for code in names:
             print(f"zone {code}")

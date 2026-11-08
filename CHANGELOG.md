@@ -7,6 +7,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- All the Alps of France, Switzerland, Italy and Austria: every zone with land in the perimeter of the
+  Alpine Convention (2025), the zones mostly outside it being cut to the perimeter:
+  - France: Savoie, Isère, Hautes-Alpes, Alpes-de-Haute-Provence, Alpes-Maritimes, Drôme, Var, Vaucluse;
+  - Italy: Turin (replacing the Gran Paradiso zone), Cuneo, Biella, Vercelli, Novara, Imperia, Savona,
+    Lecco, Bergamo, Brescia, Trentino, Verona, Vicenza, Belluno, Treviso, Pordenone, Udine, Gorizia;
+  - Austria: Steyr-Kirchdorf, Graz, Eastern and Western Styria, Sankt Pölten, Vienna surroundings,
+    Burgenland;
+  - Liechtenstein as a zone of its own (`canton:LI`).
+- Regions (`config.REGIONS`): `alpes-ouest`, `alpes-est`, `jura` and `pyrenees`, whose maps never share a
+  tile; the default zones of each country are those of the regions.
+- Configuration window: **Jura**, **Alpes occidentales** and **Alpes orientales** buttons; a selection made
+  of exactly one region is built as that region.
+
+### Changed
+
+- The `alpes` coverage is replaced by `alpes-ouest` and `alpes-est`: together the Alps would exceed what one
+  Garmin file can hold.
+- The **Toute la Suisse** button is removed.
+- IGN downloads wait and retry when the server asks to slow down (HTTP 429).
+
 ## [0.6.0] - 2026-11-06
 
 ### Added

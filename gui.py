@@ -278,13 +278,21 @@ class MapView(QGraphicsView):
 # --- Window --------------------------------------------------------------------------------
 
 def coverage_spec(selected: list[dict]) -> str:
-    """Coverage spec (see coverage.resolve) for the selected zones, in a stable order."""
+    """Coverage spec (see coverage.resolve) for the selected zones, in a stable order.
+
+    A selection made of exactly one region is built as that region's alias, which leaves
+    out the tiles of the regions before it: the maps of the regions never overlap.
+    """
+    keys = {(z["country"], z["code"]) for z in selected}
+    for region, countries in config.REGIONS.items():
+        if keys == {(c, code) for c, codes in countries.items() for code in codes}:
+            return region
     codes = {c: [z["code"] for z in selected if z["country"] == c] for c in COUNTRY_COLORS}
     parts = []
-    if set(codes["ch"]) == set(config.CANTONS):
+    if set(codes["ch"]) >= set(config.CANTONS):
         parts.append("switzerland")
     elif codes["ch"]:
-        parts.append("canton:" + ",".join(sorted(codes["ch"], key=config.CANTONS.index)))
+        parts.append("canton:" + ",".join(sorted(codes["ch"], key=(config.CANTONS + ["LI"]).index)))
     if codes["fr"]:
         parts.append("dept:" + ",".join(sorted(codes["fr"])))
     if codes["it"]:

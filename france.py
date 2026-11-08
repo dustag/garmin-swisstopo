@@ -264,7 +264,7 @@ def _geojson_2d(text):
 
 
 def download_dept(code, fetch):
-    outline = coverage.department(code)
+    outline = coverage.dept_outline(code)
     download_bdtopo(code, fetch)
     download_rgealti(code, fetch, outline)
     download_osm_rock(code, outline)
@@ -301,7 +301,7 @@ class FrenchTile:
         self.ctx, self.code = ctx, code
         box = shapely.box(*ctx.bounds)
         self.region = shapely.make_valid(shapely.difference(
-            shapely.intersection(shapely.make_valid(coverage.department(code)), box),
+            shapely.intersection(shapely.make_valid(coverage.dept_outline(code)), box),
             shapely.intersection(shapely.make_valid(coverage.switzerland()), box)))
         self.swiss_border = shapely.boundary(shapely.intersection(
             shapely.make_valid(coverage.switzerland()), box.buffer(500)))
