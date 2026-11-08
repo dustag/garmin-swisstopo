@@ -52,8 +52,19 @@ def bdtopo_path(code) -> Path:
 # --- Download ------------------------------------------------------------------------
 
 def _get(url, **kw):
+    """Open a URL, waiting when the server asks to slow down (HTTP 429) or the network drops."""
     req = urllib.request.Request(url, headers={"User-Agent": config.USER_AGENT}, **kw)
-    return urllib.request.urlopen(req, timeout=600)
+    for attempt in range(5):
+        try:
+            return urllib.request.urlopen(req, timeout=600)
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 4:
+                raise
+            time.sleep(int(e.headers.get("Retry-After") or 0) or 20 * (attempt + 1))
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == 4:
+                raise
+            time.sleep(30 * (attempt + 1))
 
 
 def ign_latest(resource, code, pattern):
