@@ -403,7 +403,7 @@ def tile_osm(tile: Tile, layer_key: str):
 def french_depts(tile: Tile):
     """French departments with downloaded data that have land in the tile."""
     box = shapely.box(*tile.bounds)
-    return [c for c in config.FRANCE_DEPTS if france.is_ready(c) and coverage.department(c).intersects(box)]
+    return [c for c in config.FRANCE_DEPTS if france.is_ready(c) and coverage.dept_outline(c).intersects(box)]
 
 
 
@@ -413,14 +413,19 @@ def build_tile(tile: Tile, force=False):
     out = config.TILES_DIR / tile.name
     status_file = out / "status.json"
     depts, zones = french_depts(tile), countries.in_tile(tile.bounds)
-    # Zones per country, e.g. {"it": ["AO"], "at": ["AT334"]}
-    osm_zones = {c: [z.code for z in zones if z.country == c] for c in config.OSM_ZONES}
+    # Zones per country, e.g. {"it": ["AO", "TO~alps"]}: zones cut to the Alps are marked, so that
+    # tiles built before the cut are rebuilt
+    osm_zones = {c: [z.code + ("~alps" if z.code in config.ALPS_CLIPPED.get(c, []) else "")
+                     for z in zones if z.country == c] for c in config.OSM_ZONES}
+    # Departments, marked when cut to the Alps or still without OpenStreetMap rock
+    fr_key = [c + ("~alps" if c in config.ALPS_CLIPPED["fr"] else "") + ("" if france.has_rock(c) else "~norock")
+              for c in depts]
     # Format of the zones' OpenStreetMap data: a zone extracted again rebuilds its tiles
     osm_formats = sorted({osmzone.osm_format(z) for z in zones})
     if not force and status_file.exists():
         status = json.loads(status_file.read_text())
         if ((status.get("format"), status.get("lang"), status.get("fr", []), status.get("osm", []))
-                == (TILE_FORMAT, config.LANG, depts, osm_formats)
+                == (TILE_FORMAT, config.LANG, fr_key, osm_formats)
                 and all(status.get(c, []) == codes for c, codes in osm_zones.items())):
             return status | {"cached": True}
     shutil.rmtree(out, ignore_errors=True)
@@ -434,7 +439,7 @@ def build_tile(tile: Tile, force=False):
         # Switzerland and the French departments keep priority over the OpenStreetMap zones
         box = shapely.box(*tile.bounds).buffer(500)
         foreign = shapely.union_all([shapely.intersection(shapely.make_valid(g), box) for g in
-                                     [coverage.switzerland()] + [coverage.department(c) for c in depts]])
+                                     [coverage.switzerland()] + [coverage.dept_outline(c) for c in depts]])
         outlines = {z.key: shapely.intersection(shapely.make_valid(z.outline()), box) for z in zones}
         others = osmzone.zone_tiles(ctx, zones, foreign, outlines)
     e0, n0, e1, n1 = tile.bounds
@@ -463,7 +468,7 @@ def build_tile(tile: Tile, force=False):
         counts["hiver"] = osm.count
     if dem.ok:
         np.savez_compressed(out / "hgt.npz", **hgt_samples(dem, tile))
-    status = {"tile": tile.name, "format": TILE_FORMAT, "lang": config.LANG, "fr": depts, **osm_zones, "osm": osm_formats,
+    status = {"tile": tile.name, "format": TILE_FORMAT, "lang": config.LANG, "fr": fr_key, **osm_zones, "osm": osm_formats,
               "counts": counts}
     status_file.write_text(json.dumps(status))
     return status
@@ -475,8 +480,9 @@ def build_tiles(cov: coverage.Coverage, jobs: int, force: bool):
         raise SystemExit("swissTLM3D not found: run download.py first")
     # Fetch and cache the outlines once, before the workers start
     coverage.switzerland()
+    coverage.alps()
     for code in config.FRANCE_DEPTS:
-        coverage.department(code)
+        coverage.dept_outline(code)
     for zone in countries.configured():
         zone.outline()
     done, failed = 0, []
@@ -527,8 +533,9 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
     # Options go to a config file (mkgmap -c): with hundreds of tiles, the command
     # line would exceed the Windows length limit.
     opts = [f"output-dir={out}", f"style-file={style}", "code-page=1252", f"max-jobs={jobs}",
-            f"family-id={family_id}", "product-id=1", f"family-name={title}", f"series-name={title}",
-            f"area-name={cov.name}", f"draw-priority={DRAW_PRIORITY[layer_key]}",
+            # Garmin names are limited to 50 characters
+            f"family-id={family_id}", "product-id=1", f"family-name={title[:50]}", f"series-name={title[:50]}",
+            f"area-name={cov.name[:50]}", f"draw-priority={DRAW_PRIORITY[layer_key]}",
             "copyright-message=(c) swisstopo, OFEV/BAFU, CAS/SAC, IGN, INGV, BEV/geoland, LDBV, IGN-ES, "
             "Copernicus, OpenStreetMap, Camptocamp",
             "merge-lines",

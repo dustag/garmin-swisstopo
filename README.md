@@ -6,16 +6,27 @@ ski touring and snowshoe routes, and wildlife quiet zones.
 
 It was written for mountain leaders and ski tourers who need a map that sticks to the
 Swiss national map content in summer as well as in winter. Maps can cover a small area, one or several
-cantons, all of Switzerland, **French departments** (Haute-Savoie, the Pyrenees) built from the open
-data of IGN, OpenStreetMap and Camptocamp, and, built from OpenStreetMap, the national open terrain
+cantons, all of Switzerland, **French departments** (the French Alps, Jura and Pyrenees) built from the
+open data of IGN, OpenStreetMap and Camptocamp, and, built from OpenStreetMap, the national open terrain
 models and Camptocamp:
-- the **Italian Alps** along the Swiss border down to the Gran Paradiso;
+- the **Italian Alps**, from Liguria to Friuli;
 - the **Austrian Alps** and the **Allgäu** (Bavaria);
 - the **Spanish Pyrenees** and **Andorra**.
 
 Swiss data always has priority, then French data, then the other countries: each one only fills the area
-outside the countries before it, and the terrain is seamless across the borders. The Alps and the
-Pyrenees make two maps (`alpes`, `pyrenees`) that can be installed together.
+outside the countries before it, and the terrain is seamless across the borders. Four regions make four
+maps that never share a tile and can all be installed together:
+
+| Region | Coverage | Zones |
+|---|---|---|
+| Western Alps | `alpes-ouest` | Swiss cantons west of the Rhine - Splügen line, French Alps (74, 73, 38, 05, 04, 06, 26, 83, 84), Aosta Valley, Piedmont, Liguria, Varese, Como |
+| Eastern Alps | `alpes-est` | Graubünden, St. Gallen, Appenzell, Liechtenstein, Lombardy east of Lake Como, Trentino-South Tyrol, Veneto, Friuli, Austria, Allgäu |
+| Jura | `jura` | Jura, Neuchâtel, Solothurn, Basel, Aargau, Vaud and Bern (Jura bernois), Doubs, Jura, Ain |
+| Pyrenees | `pyrenees` | French Pyrenees (64, 65, 31, 09, 66), Navarre, Huesca, Lleida, Girona, Andorra |
+
+Every zone with land in the perimeter of the Alpine Convention belongs to the Alps; the zones mostly outside
+it (Turin, Verona, Udine, Isère, Var, Graz…) are cut to the perimeter, so that the plains do not weigh down
+the maps.
 
 | Map | Content | When to use it |
 |---|---|---|
@@ -132,7 +143,7 @@ flowchart LR
 | `legend.py` | Map legend: Garmin types, zoom levels, colours/patterns, translated labels; generates style and TYP |
 | `gui.py` | Configuration window: zones picked on a map, options, download and build with their log |
 | `i18n.py` | Translations of the window (texts are written in French in `gui.py`) |
-| `zones.py`, `zones.json` | Names and simplified outlines of the zones shown in the window (`python zones.py` regenerates the outlines) |
+| `zones.py`, `zones.json`, `relief*` | Names and simplified outlines of the zones shown in the window, and the shaded relief under them (`python zones.py` regenerates them, `--relief` only the relief) |
 | `osmwriter.py` | Writes shapely geometries (LV95) to OSM XML (WGS84), including multipolygons with holes |
 | `.env.example` | Template of the local configuration (copy to `.env`) |
 | `requirements.txt` | Python dependencies |
@@ -204,9 +215,9 @@ Edit `.env`:
 | `JAVA_MAX_HEAP` | Memory for mkgmap | `4g` |
 | `COVERAGE` | Default coverage (see below) | `telliers` |
 | `LANG_LABELS` | Language of the labels: `fr`, `de`, `it` or `en` | `fr` |
-| `FRANCE_DEPTS` | French departments whose data is used, comma-separated | `74,64,65,31,09,66` |
-| `ITALY_ZONES` | Italian zones whose data is used: provinces by their abbreviation, and `GP` for the Piedmont side of the Gran Paradiso | `AO,VB,VA,CO,SO,BZ,GP` |
-| `AUSTRIA_ZONES` | Austrian NUTS 3 regions whose data is used | the 19 regions of the Alps, from Vorarlberg to Lower Austria |
+| `FRANCE_DEPTS` | French departments whose data is used, comma-separated | those of the regions (`config.REGIONS`) |
+| `ITALY_ZONES` | Italian zones whose data is used: provinces by their abbreviation, or `GP` for the Piedmont side of the Gran Paradiso only | those of the regions |
+| `AUSTRIA_ZONES` | Austrian NUTS 3 regions whose data is used | those of the regions (29 regions with land in the Alps) |
 | `GERMANY_ZONES` | German NUTS 3 regions whose data is used | `DE27E,DE27A,DE273` (Allgäu) |
 | `SPAIN_ZONES` | Spanish NUTS 3 provinces whose data is used | `ES220,ES241,ES513,ES512` (Navarre, Huesca, Lleida, Girona) |
 | `ANDORRA_ZONES` | Andorra, or nothing | `AD` |
@@ -218,7 +229,10 @@ python gui.py
 ```
 
 Click the cantons, French departments and zones of the other countries to put in the map (wheel to zoom,
-drag to move); the Pyrenees are drawn in a framed inset below the Alps, not at their true distance.
+drag to move), or add a whole region with the **Jura**, **Alpes occidentales** and **Alpes orientales**
+buttons; a coarse shaded relief shows the mountains under the zones, and the Pyrenees are drawn in a framed
+inset below the Alps, not at their true distance. A selection
+made of exactly one region is built as that region (`alpes-ouest`…), whose map does not overlap the others.
 Then
 choose the maps (summer base map, winter overlay or both), the label language and the folders, then **Construire les cartes**: the window runs `download.py`
 and `build.py` and shows their log. The window is in the language chosen for the labels (French, German, Italian or
@@ -255,14 +269,15 @@ The maps are written to `OUTPUT_DIR`, for example `swisstopo_telliers_base.img` 
 | All of Switzerland and Liechtenstein | `switzerland` | `Swisstopo base suisse` | 6520 |
 | One or several cantons | `canton:VS`, `canton:VS,VD` | `Swisstopo base vs-vd` | 6600 + 2 × canton index |
 | One or several French departments | `dept:74` | `Swisstopo base fr74` | 6700 + 2 × department number |
-| One or several Italian zones, or all of `ITALY_ZONES` | `it:AO,GP`, `it` | `Swisstopo base itao-gp` | 6800 + 2 × (ISTAT province code % 100) |
+| One or several cantons, with Liechtenstein (`LI`) | `canton:GR,LI` | `Swisstopo base gr-li` | as above |
+| One or several Italian zones, or all of `ITALY_ZONES` | `it:AO,TO`, `it` | `Swisstopo base itao-to` | 6800 + 2 × (ISTAT province code % 100) |
 | Austrian, German or Spanish zones, Andorra, or all the zones of a country | `at:AT334`, `at`, `de`, `es:ES241`, `ad` | `Swisstopo base at334` | 9000 + 2 × (hash of the codes % 1000) |
-| The Alps (`switzerland+dept:74+it+at+de`) or the Pyrenees (`dept:64,65,31,09,66+es+ad`) | `alpes`, `pyrenees` | `Swisstopo base alpes` | as for `+` |
+| A region of `config.REGIONS`, without the tiles of the regions before it | `alpes-ouest`, `alpes-est`, `jura`, `pyrenees` | `Swisstopo base alpes-ouest` | as for `+` |
 | Any rectangle (LV95 metres) | `bbox:2570000,1080000,2600000,1100000` | `Swisstopo base custom` | 6590 |
 | Several of the above, joined with `+` | `canton:VS+dept:74` | `Swisstopo base vs+fr74` | 7000 + 2 × (hash of the coverage % 1000) |
 
-Orders of magnitude: Switzerland is about 500 tiles, Valais about 80, Haute-Savoie about 70, the default
-Italian zones about 290, the Austrian Alps about 560, the Pyrenees about 850. Built tiles are
+Orders of magnitude: Switzerland is about 500 tiles, Valais about 80, Haute-Savoie about 70, the Western
+Alps about 990, the Eastern Alps about 1130, the Jura about 220, the Pyrenees about 850. Built tiles are
 cached, so after the first build a legend change only needs `--step mkgmap`.
 
 A French department is downloaded the first time a coverage touches it, if it is listed in
@@ -270,11 +285,9 @@ A French department is downloaded the first time a coverage touches it, if it is
 API is queried gently). Tiles on the border then contain both countries; tiles built before the
 department was available are rebuilt automatically.
 
-Italian zones work the same way with `ITALY_ZONES`. The default zones are the provinces bordering
-Switzerland (Aosta, Verbano-Cusio-Ossola, Varese, Como, Sondrio, Bolzano) and `GP`, the six municipalities
-of the Gran Paradiso in the province of Turin (Valle Orco, Valle Soana), so that the whole massif is
-covered without the plain of Turin. Their download takes about 1.5 GB: two OpenStreetMap extracts of
-Geofabrik, read once and deleted, and the TINITALY terrain tiles, converted and deleted.
+Italian zones work the same way with `ITALY_ZONES`: the provinces of the Alps, from Imperia to Gorizia.
+Their download takes about 1.5 GB: two OpenStreetMap extracts of Geofabrik (north-west and north-east),
+read once and deleted, and the TINITALY terrain tiles, converted and deleted.
 
 Austria, the Allgäu, Spain and Andorra work the same way. Their downloads:
 
@@ -288,14 +301,25 @@ Austria, the Allgäu, Spain and Andorra work the same way. Their downloads:
 The sources are deleted once converted. A coverage that does not touch Switzerland, such as `pyrenees`,
 does not download the Swiss data.
 
-For the Alps and the Pyrenees:
+For the four regions:
 
 ```powershell
-python download.py --coverage alpes
-python build.py --coverage alpes
-python download.py --coverage pyrenees
-python build.py --coverage pyrenees
+python download.py --coverage alpes-ouest
+python build.py --coverage alpes-ouest
+# then alpes-est, jura and pyrenees the same way
 ```
+
+The open data is the same everywhere in a country, but its quality varies:
+
+| Country | Terrain | Map data |
+|---|---|---|
+| Switzerland | swissALTI3D, 2 m lidar averaged to 5 m | swissTLM3D, uniform |
+| France | RGE ALTI 5 m, editions 2020 (73, 38, 05) to 2023 (04, 06); lidar in the valleys and forests, aerial photo correlation on the high summits, less precise | BD TOPO, uniform |
+| Italy | TINITALY 10 m everywhere | OpenStreetMap: very complete in South Tyrol and Trentino, thinner in some valleys of Piedmont and Friuli |
+| Austria | DGM Österreich 10 m everywhere | OpenStreetMap, very complete |
+| Allgäu, Spain, Andorra | DGM1 Bayern (5 m), IGN MDT 5 m, Copernicus 30 m | OpenStreetMap |
+
+Camptocamp ski touring routes are numerous in the Western Alps and the Pyrenees, and few in eastern Austria.
 
 To add a named area, add an entry to `AREAS` in `config.py` with an unused **even** family id and the
 bounding box in LV95 metres (read the coordinates on [map.geo.admin.ch](https://map.geo.admin.ch)):
@@ -442,21 +466,24 @@ share them:
 | DGM Österreich 10 m (terrain in Austria) | © geoland.at / BEV | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), attribution |
 | DGM1 (terrain in Bavaria) | © Bayerische Vermessungsverwaltung (LDBV) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), attribution |
 | MDT 5 m (terrain in Spain) | © Instituto Geográfico Nacional de España | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), attribution |
-| Copernicus GLO-30 (terrain in Andorra) | © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA | [Copernicus DEM licence](https://spacedata.copernicus.eu/documents/20123/121286/CSCDA_ESA_Mission-specific+Annex_31_Oct_22.pdf), attribution |
+| Copernicus GLO-30 (terrain in Andorra), GLO-90 (relief of the window) | © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA | [Copernicus DEM licence](https://spacedata.copernicus.eu/documents/20123/121286/CSCDA_ESA_Mission-specific+Annex_31_Oct_22.pdf), attribution |
 | NUTS regions and country outlines | © EuroGeographics for the administrative boundaries (GISCO, Eurostat) | Free reuse with attribution, [Eurostat terms](https://ec.europa.eu/eurostat/web/gisco/geodata/administrative-units) |
+| Perimeter of the Alpine Convention 2025 | © Permanent Secretariat of the Alpine Convention, [doi:10.48784/VK93-8P54](https://doi.org/10.48784/VK93-8P54) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), attribution |
 | Rock and scree areas in France, map data in Italy, Austria, Germany, Spain and Andorra | © OpenStreetMap contributors | [ODbL](https://www.openstreetmap.org/copyright), attribution |
 | Ski touring routes outside Switzerland | © Camptocamp.org contributors | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/): attribution, and maps you share must use the same licence |
 | mkgmap (map compiler, not redistributed) | mkgmap contributors | GPL v2 |
 
 This project is not affiliated with swisstopo, the FOEN, the Swiss Alpine Club, IGN, INGV, ISTAT,
-geoland.at, BEV, LDBV, IGN España, Eurostat, OpenStreetMap or Camptocamp.
+geoland.at, BEV, LDBV, IGN España, Eurostat, the Alpine Convention, OpenStreetMap or Camptocamp.
 
 ---
 
 ## Limitations and ideas
 
 - Outside Switzerland, only the zones of `FRANCE_DEPTS`, `ITALY_ZONES`, `AUSTRIA_ZONES`, `GERMANY_ZONES`,
-  `SPAIN_ZONES` and `ANDORRA_ZONES` are covered.
+  `SPAIN_ZONES` and `ANDORRA_ZONES` are covered. Of the Alps, the Bavarian Alps east of the Allgäu, the
+  Slovenian Alps and Monaco are not included yet. The Swiss Plateau cantons (Zurich, Zug, Thurgau,
+  Schaffhausen, Geneva) belong to no region: click them to add them.
 - Austria has a 10 m terrain model, like Italy: small terrain features and short steep steps are smoothed
   out in the slope classes. The BEV also publishes a 1 m model (CC BY 4.0), not used yet. Andorra only has
   the 30 m Copernicus model, a surface model where the forest raises the ground by a few metres.

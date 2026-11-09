@@ -20,9 +20,10 @@ from pathlib import Path
 from PySide6.QtCore import (QLibraryInfo, QLocale, QPointF, QProcess, QProcessEnvironment, QRectF, QSettings, Qt,
                             QTranslator, QUrl, Signal)
 from PySide6.QtGui import (QBrush, QColor, QDesktopServices, QFont, QFontDatabase, QFontMetricsF, QPainter,
-                           QPainterPath, QPainterPathStroker, QPen, QPolygonF)
+                           QPainterPath, QPainterPathStroker, QPen, QPixmap, QPolygonF, QTransform)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGraphicsItem,
-                               QGraphicsPathItem, QGraphicsRectItem, QGraphicsScene, QGraphicsSimpleTextItem,
+                               QGraphicsPathItem, QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsScene,
+                               QGraphicsSimpleTextItem,
                                QGraphicsView, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                                QSpinBox, QSplitter, QToolButton, QVBoxLayout, QWidget)
@@ -45,6 +46,8 @@ LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "en": "Englis
 # with Austria and the Allgäu (0.92 + 0.87 MB) maps
 MB_PER_TILE = {"base": 0.95, "hiver": 0.85}
 MAP_NAMES = {"base": "été", "hiver": "hiver"}
+# Regions with a selection button (texts translated in i18n.py)
+REGION_BUTTONS = {"jura": "Jura", "alpes-ouest": "Alpes occidentales", "alpes-est": "Alpes orientales"}
 PROGRESS = re.compile(r"\[?(\d+)\s*/\s*(\d+)\]?")
 
 
@@ -82,7 +85,7 @@ class ZoneItem(QGraphicsPathItem):
     def update_style(self):
         color = COUNTRY_COLORS[self.zone["country"]]
         fill = QColor(color)
-        fill.setAlpha(170 if self.selected else 90 if self.hovered else 30)
+        fill.setAlpha(120 if self.selected else 70 if self.hovered else 25)   # the relief shows through
         pen = QPen(color.darker(130), 2 if self.selected else 1)
         pen.setCosmetic(True)
         self.setPen(pen)
@@ -172,6 +175,20 @@ class MapView(QGraphicsView):
     def __init__(self, zone_list: list[dict]):
         super().__init__()
         self.setScene(QGraphicsScene(self))
+        # Coarse shaded relief under the zones (see zones.make_relief)
+        for relief in zones.load_relief():
+            pixmap = QPixmap(str(zones.REPO / relief["file"]))
+            if pixmap.isNull():
+                continue
+            item = QGraphicsPixmapItem(pixmap)
+            item.setTransformationMode(Qt.SmoothTransformation)
+            item.setTransform(QTransform.fromScale(relief["res"], relief["res"]))
+            e0, _, _, n1 = relief["bounds"]
+            dx, dy = relief["offset"]
+            item.setPos(e0 + dx, -(n1 + dy))
+            item.setZValue(-1)
+            item.setAcceptedMouseButtons(Qt.NoButton)
+            self.scene().addItem(item)
         self.items_by_key = {}
         self.labels = []
         for zone in zone_list:
@@ -189,7 +206,11 @@ class MapView(QGraphicsView):
                 rect = rect.united(r)
             self.inset = InsetFrame(rect.adjusted(-10_000, -15_000, 10_000, 10_000))
             self.scene().addItem(self.inset)
-        self.home = self.scene().itemsBoundingRect().adjusted(-5000, -5000, 5000, 5000)
+        # Home view on the zones (the relief extends a little beyond them)
+        rect = None
+        for item in list(self.items_by_key.values()) + ([self.inset] if self.inset else []):
+            rect = item.sceneBoundingRect() if rect is None else rect.united(item.sceneBoundingRect())
+        self.home = rect.adjusted(-5000, -5000, 5000, 5000)
         self.setSceneRect(self.home.adjusted(-100_000, -100_000, 100_000, 100_000))
         self.setRenderHint(QPainter.Antialiasing)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
@@ -278,13 +299,21 @@ class MapView(QGraphicsView):
 # --- Window --------------------------------------------------------------------------------
 
 def coverage_spec(selected: list[dict]) -> str:
-    """Coverage spec (see coverage.resolve) for the selected zones, in a stable order."""
+    """Coverage spec (see coverage.resolve) for the selected zones, in a stable order.
+
+    A selection made of exactly one region is built as that region's alias, which leaves
+    out the tiles of the regions before it: the maps of the regions never overlap.
+    """
+    keys = {(z["country"], z["code"]) for z in selected}
+    for region, countries in config.REGIONS.items():
+        if keys == {(c, code) for c, codes in countries.items() for code in codes}:
+            return region
     codes = {c: [z["code"] for z in selected if z["country"] == c] for c in COUNTRY_COLORS}
     parts = []
-    if set(codes["ch"]) == set(config.CANTONS):
+    if set(codes["ch"]) >= set(config.CANTONS):
         parts.append("switzerland")
     elif codes["ch"]:
-        parts.append("canton:" + ",".join(sorted(codes["ch"], key=config.CANTONS.index)))
+        parts.append("canton:" + ",".join(sorted(codes["ch"], key=(config.CANTONS + ["LI"]).index)))
     if codes["fr"]:
         parts.append("dept:" + ",".join(sorted(codes["fr"])))
     if codes["it"]:
@@ -378,20 +407,29 @@ class MainWindow(QMainWindow):
         # Zones
         self.help = QLabel(wordWrap=True)
         self.summary = QLabel(wordWrap=True)
-        self.whole = QPushButton()
-        self.whole.clicked.connect(lambda: self.map.set_selected({("ch", c) for c in config.CANTONS}))
+        # One button per region (config.REGIONS): adds its zones to the selection
+        self.region_buttons = {}
+        for region in REGION_BUTTONS:
+            b = QPushButton()
+            b.clicked.connect(lambda _=False, r=region: self.map.set_selected(
+                {(country, code) for country, codes in config.REGIONS[r].items() for code in codes}))
+            self.region_buttons[region] = b
         self.clear = QPushButton()
         self.clear.clicked.connect(lambda: self.map.set_selected(set(), exclusive=True))
         self.home = QPushButton()
         self.home.clicked.connect(self.map.fit_home)
         buttons = QHBoxLayout()
-        for b in (self.whole, self.clear, self.home):
+        for b in self.region_buttons.values():
             buttons.addWidget(b)
+        tools = QHBoxLayout()
+        for b in (self.clear, self.home):
+            tools.addWidget(b)
         self.zone_box = QGroupBox()
         zone_layout = QVBoxLayout(self.zone_box)
         zone_layout.addWidget(self.help)
         zone_layout.addWidget(self.summary)
         zone_layout.addLayout(buttons)
+        zone_layout.addLayout(tools)
 
         # Options
         self.lang = QComboBox()
@@ -517,7 +555,8 @@ class MainWindow(QMainWindow):
         self.zone_box.setTitle(tr("Zones"))
         self.help.setText(tr("Cliquez sur la carte pour choisir les zones. "
                              "Molette pour zoomer, glisser pour se déplacer."))
-        self.whole.setText(tr("Toute la Suisse"))
+        for region, label in REGION_BUTTONS.items():
+            self.region_buttons[region].setText(tr(label))
         self.clear.setText(tr("Tout désélectionner"))
         self.home.setText(tr("Recentrer"))
         self.options.setTitle(tr("Options"))

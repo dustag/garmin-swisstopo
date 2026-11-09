@@ -52,8 +52,19 @@ def bdtopo_path(code) -> Path:
 # --- Download ------------------------------------------------------------------------
 
 def _get(url, **kw):
+    """Open a URL, waiting when the server asks to slow down (HTTP 429) or the network drops."""
     req = urllib.request.Request(url, headers={"User-Agent": config.USER_AGENT}, **kw)
-    return urllib.request.urlopen(req, timeout=600)
+    for attempt in range(5):
+        try:
+            return urllib.request.urlopen(req, timeout=600)
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 4:
+                raise
+            time.sleep(int(e.headers.get("Retry-After") or 0) or 20 * (attempt + 1))
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == 4:
+                raise
+            time.sleep(30 * (attempt + 1))
 
 
 def ign_latest(resource, code, pattern):
@@ -142,11 +153,12 @@ def download_rgealti(code, fetch, outline):
 
 
 def overpass(query, dest, attempts=6):
-    """Run an Overpass query into a file, retrying when the server is busy or down."""
+    """Run an Overpass query into a file, retrying on the next server when one is busy or down."""
     part = dest.with_suffix(".part")
     for attempt in range(attempts):
+        server = config.OVERPASS[attempt % len(config.OVERPASS)]
         try:
-            with _get(config.OVERPASS, data=urllib.parse.urlencode({"data": query}).encode()) as r, \
+            with _get(server, data=urllib.parse.urlencode({"data": query}).encode()) as r, \
                     open(part, "wb") as f:
                 shutil.copyfileobj(r, f)
             part.replace(dest)
@@ -157,7 +169,11 @@ def overpass(query, dest, attempts=6):
         except (urllib.error.URLError, ConnectionError, TimeoutError):
             if attempt == attempts - 1:
                 raise
-        time.sleep(60 * (attempt + 1))
+        time.sleep(30 * (attempt + 1))
+
+
+def has_rock(code) -> bool:
+    return (dept_dir(code) / "osm_rock.gpkg").exists()
 
 
 def download_osm_rock(code, outline, chunks=4):
@@ -183,7 +199,13 @@ def download_osm_rock(code, outline, chunks=4):
             # Pieces already fetched are kept until the end, so an interrupted run resumes
             raw = dept_dir(code) / f"osm_rock_{i}_{j}.osm"
             if not raw.exists():
-                overpass(query, raw)
+                try:
+                    overpass(query, raw)
+                except (urllib.error.URLError, ConnectionError, TimeoutError) as e:
+                    # Not worth stopping the whole download: the next run tries again
+                    print(f"  OpenStreetMap {code}: rock and scree not available for now ({e}); "
+                          "run download.py again later to add them")
+                    return
             df = pyogrio.read_dataframe(raw, layer="multipolygons", columns=["osm_id", "osm_way_id", "natural"])
             frames.append(df[df["natural"].isin(["bare_rock", "scree", "shingle"])])
     df = gpd.GeoDataFrame(pd.concat(frames, ignore_index=True), crs=frames[0].crs)
@@ -253,7 +275,7 @@ def _geojson_2d(text):
 
 
 def download_dept(code, fetch):
-    outline = coverage.department(code)
+    outline = coverage.dept_outline(code)
     download_bdtopo(code, fetch)
     download_rgealti(code, fetch, outline)
     download_osm_rock(code, outline)
@@ -290,7 +312,7 @@ class FrenchTile:
         self.ctx, self.code = ctx, code
         box = shapely.box(*ctx.bounds)
         self.region = shapely.make_valid(shapely.difference(
-            shapely.intersection(shapely.make_valid(coverage.department(code)), box),
+            shapely.intersection(shapely.make_valid(coverage.dept_outline(code)), box),
             shapely.intersection(shapely.make_valid(coverage.switzerland()), box)))
         self.swiss_border = shapely.boundary(shapely.intersection(
             shapely.make_valid(coverage.switzerland()), box.buffer(500)))
@@ -346,9 +368,10 @@ def write_base(ft: FrenchTile, osm, dem):
     for g, nature, pos in zip(df.geometry, df.nature, df.position_par_rapport_au_sol):
         if nature in WATER and not _is_underground(pos):
             osm.add(clip(g), {"k": WATER[nature]})
-    df = ft.read("rock", ["natural"], path=dept_dir(ft.code) / "osm_rock.gpkg", crs_bbox=LV95)
-    for g, natural in zip(df.geometry, df.natural):
-        osm.add(clip(g), {"k": OSM_ROCK[natural]})
+    if has_rock(ft.code):   # may be missing when Overpass was down (see download_osm_rock)
+        df = ft.read("rock", ["natural"], path=dept_dir(ft.code) / "osm_rock.gpkg", crs_bbox=LV95)
+        for g, natural in zip(df.geometry, df.natural):
+            osm.add(clip(g), {"k": OSM_ROCK[natural]})
     for g in ft.read("batiment", ["nature"]).geometry:
         osm.add(clip(g), {"k": "building"})
 

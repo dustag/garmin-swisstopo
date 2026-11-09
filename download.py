@@ -146,9 +146,13 @@ def main():
 
     # French departments touching the coverage
     for code in config.FRANCE_DEPTS:
-        if coverage.department(code).intersects(tiles) and not france.is_ready(code):
+        if not coverage.dept_outline(code).intersects(tiles):
+            continue
+        if not france.is_ready(code):
             print(f"France, department {code}:")
             france.download_dept(code, fetch)
+        elif not france.has_rock(code):   # Overpass was down last time
+            france.download_osm_rock(code, coverage.dept_outline(code))
 
     # Zones mapped from OpenStreetMap (Italy, Austria...) touching the coverage
     zones = [z for z in countries.configured() if z.area().intersects(tiles)

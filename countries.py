@@ -51,9 +51,12 @@ class Zone:
         return (self.dir / "ready").exists()
 
     def outline(self):
+        """Mapped part of the zone (cut to the Alps for the zones mostly outside them)."""
         if self.country == "it":
-            return coverage.italy_zone(self.code)
-        return coverage.nuts_zone(self.country, self.code)
+            geom = coverage.italy_zone(self.code)
+        else:
+            geom = coverage.nuts_zone(self.country, self.code)
+        return coverage.clip_alps(self.country, self.code, geom)
 
     def area(self):
         return self.outline().buffer(ZONE_MARGIN)

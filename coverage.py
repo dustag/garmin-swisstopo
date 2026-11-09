@@ -25,6 +25,9 @@ import config
 # as the row index is within [-50, 50).
 E_ORIGIN, N_ORIGIN = 2_480_000, 1_070_000
 N_ROWS = 100
+# Longest coverage name: it goes into the file names and the Garmin map names (50 characters,
+# with "Swisstopo base " in front)
+MAX_NAME = 32
 _WGS84_TO_LV95 = Transformer.from_crs(4326, 2056, always_xy=True)
 
 
@@ -95,6 +98,39 @@ def switzerland():
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_bytes(shapely.to_wkb(geom))
     return geom
+
+
+def alps():
+    """Perimeter of the Alpine Convention in LV95 (cached)."""
+    cache = config.DOWNLOAD_DIR / "alps_perimeter.wkb"
+    if cache.exists():
+        return shapely.from_wkb(cache.read_bytes())
+    req = urllib.request.Request(config.ALPS_PERIMETER, headers={"User-Agent": config.USER_AGENT})
+    feats = json.load(urllib.request.urlopen(req, timeout=600))["features"]
+    geom = shapely.make_valid(shapely.union_all([shapely.geometry.shape(f["geometry"]) for f in feats]))
+    geom = shapely.transform(geom, lambda xy: np.column_stack(_WGS84_TO_LV95.transform(xy[:, 0], xy[:, 1])))
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(shapely.to_wkb(geom))
+    return geom
+
+
+def clip_alps(country: str, code: str, geom):
+    """Zone outline, cut to the Alps when the zone is mostly outside them (config.ALPS_CLIPPED)."""
+    if code not in config.ALPS_CLIPPED.get(country, []):
+        return geom
+    return shapely.intersection(shapely.make_valid(geom), alps().buffer(config.ALPS_MARGIN, quad_segs=4))
+
+
+def dept_outline(code: str):
+    """Part of a French department that is mapped (cut to the Alps for some departments)."""
+    return clip_alps("fr", code, department(code))
+
+
+def canton(code: str):
+    """Outline of a canton, or of Liechtenstein (LI)."""
+    if code == "LI":
+        return boundary("ch.swisstopo.swissboundaries3d-land-flaeche.fill", "id", "LI")
+    return boundary("ch.swisstopo.swissboundaries3d-kanton-flaeche.fill", "ak", code)
 
 
 def department(code: str):
@@ -219,13 +255,19 @@ def resolve(spec: str) -> Coverage:
     configured zones of a country), "bbox:E0,N0,E1,N1", an alias of config.ALIASES, or
     several of them joined with "+"."""
     if spec in config.ALIASES:
+        # A region leaves out the tiles of the regions before it: their maps never overlap
         cov = resolve(config.ALIASES[spec])
-        return Coverage(spec, cov.family_id, cov.tiles)
+        before = list(config.ALIASES)[:list(config.ALIASES).index(spec)]
+        taken = {t for other in before for t in resolve(config.ALIASES[other]).tiles}
+        return Coverage(spec, cov.family_id, [t for t in cov.tiles if t not in taken])
     if "+" in spec:
         parts = [resolve(p) for p in spec.split("+")]
         tiles = sorted({t for c in parts for t in c.tiles}, key=lambda t: (t.e, t.n))
         fid = config.COMBINED_FAMILY_ID + 2 * (zlib.crc32(spec.encode()) % 1000)
-        return Coverage("+".join(c.name for c in parts), fid, tiles)
+        name = "+".join(c.name for c in parts)
+        if len(name) > MAX_NAME:   # long selections: short readable start and a stable fingerprint
+            name = f"{name[:MAX_NAME - 7]}-{zlib.crc32(spec.encode()):06x}"[:MAX_NAME]
+        return Coverage(name, fid, tiles)
     kind, _, arg = spec.partition(":")
     if spec in config.AREAS:
         fid, bbox = config.AREAS[spec]
@@ -234,16 +276,15 @@ def resolve(spec: str) -> Coverage:
         return Coverage("suisse", config.SWITZERLAND_FAMILY_ID, tiles_for(switzerland()))
     if kind == "canton":
         codes = [c.strip().upper() for c in arg.split(",")]
-        unknown = set(codes) - set(config.CANTONS)
+        unknown = set(codes) - set(config.CANTONS) - {"LI"}
         if unknown:
             raise ValueError(f"unknown canton(s): {', '.join(sorted(unknown))}")
-        geom = shapely.union_all([boundary("ch.swisstopo.swissboundaries3d-kanton-flaeche.fill", "ak", c)
-                                  for c in codes])
-        fid = config.CANTON_FAMILY_ID + 2 * config.CANTONS.index(codes[0])
+        geom = shapely.union_all([canton(c) for c in codes])
+        fid = config.CANTON_FAMILY_ID + 2 * (config.CANTONS.index(codes[0]) if codes[0] in config.CANTONS else 26)
         return Coverage("-".join(codes).lower(), fid, tiles_for(geom))
     if kind == "dept":
         codes = [c.strip().zfill(2) for c in arg.split(",")]
-        geom = shapely.union_all([department(c) for c in codes])
+        geom = shapely.union_all([dept_outline(c) for c in codes])
         fid = config.DEPT_FAMILY_ID + 2 * int(codes[0])
         return Coverage("fr" + "-".join(codes), fid, tiles_for(geom))
     if kind in config.OSM_ZONES:

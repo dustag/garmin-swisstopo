@@ -78,39 +78,83 @@ LANG = os.environ.get("LANG_LABELS", "fr").lower()
 if LANG not in ("fr", "de", "it", "en"):
     raise ValueError(f"LANG_LABELS must be fr, de, it or en (got {LANG!r})")
 
-# French departments whose data is used. Switzerland always has priority: French
-# data only fills the parts of a tile outside Switzerland.
-FRANCE_DEPTS = [d.strip() for d in os.environ.get("FRANCE_DEPTS", "74,64,65,31,09,66").split(",") if d.strip()]
+# Regions: the zones of each country that make them up (cantons, French departments,
+# Italian provinces, NUTS 3 regions...). They are the aliases of the same name (see
+# ALIASES), the buttons of the window, and the default zones of each country. The Alps
+# take every zone with land in the perimeter of the Alpine Convention; the Alps are
+# split along the Rhine - Splügen - Lake Como line, so that each map stays well below the
+# 4 GB a Garmin file can hold.
+REGIONS = {
+    "alpes-ouest": {
+        "ch": ["VS", "VD", "FR", "BE", "LU", "OW", "NW", "UR", "SZ", "GL", "TI"],
+        "fr": ["74", "73", "38", "05", "04", "06", "26", "83", "84"],
+        "it": ["AO", "VB", "VA", "CO", "TO", "CN", "BI", "VC", "NO", "IM", "SV"],
+    },
+    "alpes-est": {
+        "ch": ["GR", "SG", "AR", "AI", "LI"],
+        "it": ["SO", "BZ", "LC", "BG", "BS", "TN", "VR", "VI", "BL", "TV", "PN", "UD", "GO"],
+        "at": ["AT341", "AT342", "AT331", "AT332", "AT333", "AT334", "AT335", "AT321", "AT322", "AT323",
+               "AT211", "AT212", "AT213", "AT221", "AT222", "AT223", "AT224", "AT225", "AT226",
+               "AT314", "AT315", "AT121", "AT122", "AT123", "AT126", "AT127", "AT111", "AT112", "AT113"],
+        "de": ["DE27E", "DE27A", "DE273"],
+    },
+    "jura": {
+        "ch": ["JU", "NE", "SO", "BL", "BS", "AG", "VD", "BE"],
+        "fr": ["25", "39", "01"],
+    },
+    "pyrenees": {
+        "fr": ["64", "65", "31", "09", "66"],
+        "es": ["ES220", "ES241", "ES513", "ES512"],
+        "ad": ["AD"],
+    },
+}
+# Zones of the Alps partly outside the Alpine Convention (less than 90 % inside): they
+# are cut to its perimeter, widened by ALPS_MARGIN, so that the plains (Turin, Verona,
+# the Rhône valley, Graz...) do not weigh down the maps.
+ALPS_CLIPPED = {
+    "fr": ["26", "38", "83", "84"],
+    "it": ["TO", "VC", "BI", "NO", "CN", "IM", "SV", "VA", "CO", "LC", "BG", "BS", "VR", "VI", "TV",
+           "PN", "UD", "GO"],
+    "at": ["AT111", "AT112", "AT113", "AT121", "AT123", "AT126", "AT127", "AT221", "AT224", "AT225",
+           "AT314", "AT315", "AT323"],
+}
+ALPS_MARGIN = 2000  # m
 
-# Italian zones whose data is used: provinces by their ISTAT abbreviation (AO, VB...)
-# or GP, the Piedmont side of the Gran Paradiso (its municipalities in the province
-# of Turin). The default covers the provinces bordering Switzerland and the whole
-# Gran Paradiso. Switzerland and the French departments have priority.
-ITALY_ZONES = [z.strip().upper() for z in os.environ.get("ITALY_ZONES", "AO,VB,VA,CO,SO,BZ,GP").split(",")
-               if z.strip()]
-GRAN_PARADISO = ["Ceresole Reale", "Locana", "Noasca", "Ribordone", "Ronco Canavese", "Valprato Soana"]
 
-
-def _zones(var, default):
+def _zones(var, country):
+    """Zones of a country from the environment, by default those of all the regions."""
+    default = ",".join(dict.fromkeys(c for r in REGIONS.values() for c in r.get(country, [])))
     return [z.strip().upper() for z in os.environ.get(var, default).split(",") if z.strip()]
 
 
-# Austrian, German and Spanish zones, by their NUTS 3 code (Eurostat), and Andorra (AD).
-# The defaults cover the Austrian Alps, the Allgäu and the Spanish Pyrenees.
-AUSTRIA_ZONES = _zones("AUSTRIA_ZONES", "AT341,AT342,AT331,AT332,AT333,AT334,AT335,AT321,AT322,AT323,"
-                                        "AT211,AT212,AT213,AT222,AT223,AT226,AT315,AT121,AT122")
-GERMANY_ZONES = _zones("GERMANY_ZONES", "DE27E,DE27A,DE273")
-SPAIN_ZONES = _zones("SPAIN_ZONES", "ES220,ES241,ES513,ES512")
-ANDORRA_ZONES = _zones("ANDORRA_ZONES", "AD")
+# French departments whose data is used. Switzerland always has priority: French
+# data only fills the parts of a tile outside Switzerland.
+FRANCE_DEPTS = [d.zfill(2) for d in _zones("FRANCE_DEPTS", "fr")]
+
+# Italian zones whose data is used: provinces by their ISTAT abbreviation (AO, VB...),
+# or GP, the Piedmont side of the Gran Paradiso (its municipalities in the province of
+# Turin, for a map of the massif without the rest of the province).
+ITALY_ZONES = _zones("ITALY_ZONES", "it")
+GRAN_PARADISO = ["Ceresole Reale", "Locana", "Noasca", "Ribordone", "Ronco Canavese", "Valprato Soana"]
+
+# Austrian, German and Spanish zones, by their NUTS 3 code (Eurostat), and Andorra (AD)
+AUSTRIA_ZONES = _zones("AUSTRIA_ZONES", "at")
+GERMANY_ZONES = _zones("GERMANY_ZONES", "de")
+SPAIN_ZONES = _zones("SPAIN_ZONES", "es")
+ANDORRA_ZONES = _zones("ANDORRA_ZONES", "ad")
 # Countries mapped from OpenStreetMap, in priority order (after Switzerland and France)
 OSM_ZONES = {"it": ITALY_ZONES, "at": AUSTRIA_ZONES, "de": GERMANY_ZONES, "es": SPAIN_ZONES, "ad": ANDORRA_ZONES}
 
-# Coverage aliases. The Alps and the Pyrenees do not share any tile: both maps can be
-# installed together.
-ALIASES = {
-    "alpes": "switzerland+dept:74+it+at+de",
-    "pyrenees": "dept:64,65,31,09,66+es+ad",
-}
+
+def region_spec(region: str) -> str:
+    """Coverage spec of a region, e.g. "canton:JU,NE+dept:25,39"."""
+    kinds = {"ch": "canton", "fr": "dept"}
+    return "+".join(f"{kinds.get(c, c)}:{','.join(codes)}" for c, codes in REGIONS[region].items())
+
+
+# Coverage aliases: the regions. A region leaves out the tiles of the regions before it,
+# so that the maps of the regions never share a tile and can all be installed together.
+ALIASES = {name: region_spec(name) for name in REGIONS}
 
 STAC = "https://data.geo.admin.ch/api/stac/v0.9"
 IGN_DOWNLOAD = "https://data.geopf.fr/telechargement"
@@ -123,7 +167,13 @@ AUSTRIA_DGM = "https://gis.ktn.gv.at/OGD/Geographie_Planung/ogd-10m-at.zip"
 BAVARIA_DGM1 = "https://download1.bayernwolke.de/a/dgm/dgm1"
 SPAIN_MDT_WCS = "https://servicios.idee.es/wcs-inspire/mdt"
 COPERNICUS_DEM = "https://copernicus-dem-30m.s3.amazonaws.com"
-OVERPASS = "https://overpass-api.de/api/interpreter"
+# Perimeter of the Alpine Convention, 2025 (Permanent Secretariat of the Alpine Convention,
+# CC BY 4.0, doi:10.48784/VK93-8P54)
+ALPS_PERIMETER = ("https://www.atlas.alpconv.org/geoserver/ows?service=WFS&version=1.0.0&request=GetFeature"
+                  "&typeName=geonode:Alpine_Convention_Perimeter_2025&outputFormat=application/json&srsName=EPSG:4326")
+# Public Overpass servers, tried in turn: each one goes down from time to time
+OVERPASS = ["https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter"]
 CAMPTOCAMP_API = "https://api.camptocamp.org"
 USER_AGENT = "swisstopo-garmin (https://github.com/dustag/garmin-swisstopo)"
 GEOADMIN_API = "https://api3.geo.admin.ch/rest/services/api/MapServer"
