@@ -7,6 +7,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-09
+
 ### Added
 
 - All the Alps of France, Switzerland, Italy and Austria: every zone with land in the perimeter of the
@@ -29,6 +31,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Garmin file can hold.
 - The **Toute la Suisse** button is removed.
 - IGN downloads wait and retry when the server asks to slow down (HTTP 429).
+- OpenStreetMap queries (Overpass) try several public servers in turn; when all of them are down, a
+  French department is downloaded without its rock and scree areas, which the next run adds.
+
+### Fixed
+
+- A selection of many zones in the window made mkgmap fail ("Description is too long"): long coverage
+  names are shortened with a fingerprint, and every name given to mkgmap is capped at 50 characters.
+- A brief network drop no longer stops a download.
 
 ## [0.6.0] - 2026-11-06
 
@@ -167,7 +177,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.3.0...v0.4.0
