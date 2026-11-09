@@ -533,8 +533,9 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
     # Options go to a config file (mkgmap -c): with hundreds of tiles, the command
     # line would exceed the Windows length limit.
     opts = [f"output-dir={out}", f"style-file={style}", "code-page=1252", f"max-jobs={jobs}",
-            f"family-id={family_id}", "product-id=1", f"family-name={title}", f"series-name={title}",
-            f"area-name={cov.name}", f"draw-priority={DRAW_PRIORITY[layer_key]}",
+            # Garmin names are limited to 50 characters
+            f"family-id={family_id}", "product-id=1", f"family-name={title[:50]}", f"series-name={title[:50]}",
+            f"area-name={cov.name[:50]}", f"draw-priority={DRAW_PRIORITY[layer_key]}",
             "copyright-message=(c) swisstopo, OFEV/BAFU, CAS/SAC, IGN, INGV, BEV/geoland, LDBV, IGN-ES, "
             "Copernicus, OpenStreetMap, Camptocamp",
             "merge-lines",

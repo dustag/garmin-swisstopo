@@ -25,6 +25,9 @@ import config
 # as the row index is within [-50, 50).
 E_ORIGIN, N_ORIGIN = 2_480_000, 1_070_000
 N_ROWS = 100
+# Longest coverage name: it goes into the file names and the Garmin map names (50 characters,
+# with "Swisstopo base " in front)
+MAX_NAME = 32
 _WGS84_TO_LV95 = Transformer.from_crs(4326, 2056, always_xy=True)
 
 
@@ -261,7 +264,10 @@ def resolve(spec: str) -> Coverage:
         parts = [resolve(p) for p in spec.split("+")]
         tiles = sorted({t for c in parts for t in c.tiles}, key=lambda t: (t.e, t.n))
         fid = config.COMBINED_FAMILY_ID + 2 * (zlib.crc32(spec.encode()) % 1000)
-        return Coverage("+".join(c.name for c in parts), fid, tiles)
+        name = "+".join(c.name for c in parts)
+        if len(name) > MAX_NAME:   # long selections: short readable start and a stable fingerprint
+            name = f"{name[:MAX_NAME - 7]}-{zlib.crc32(spec.encode()):06x}"[:MAX_NAME]
+        return Coverage(name, fid, tiles)
     kind, _, arg = spec.partition(":")
     if spec in config.AREAS:
         fid, bbox = config.AREAS[spec]
