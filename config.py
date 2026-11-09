@@ -171,7 +171,9 @@ COPERNICUS_DEM = "https://copernicus-dem-30m.s3.amazonaws.com"
 # CC BY 4.0, doi:10.48784/VK93-8P54)
 ALPS_PERIMETER = ("https://www.atlas.alpconv.org/geoserver/ows?service=WFS&version=1.0.0&request=GetFeature"
                   "&typeName=geonode:Alpine_Convention_Perimeter_2025&outputFormat=application/json&srsName=EPSG:4326")
-OVERPASS = "https://overpass-api.de/api/interpreter"
+# Public Overpass servers, tried in turn: each one goes down from time to time
+OVERPASS = ["https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter"]
 CAMPTOCAMP_API = "https://api.camptocamp.org"
 USER_AGENT = "swisstopo-garmin (https://github.com/dustag/garmin-swisstopo)"
 GEOADMIN_API = "https://api3.geo.admin.ch/rest/services/api/MapServer"

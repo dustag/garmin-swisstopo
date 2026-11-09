@@ -417,7 +417,9 @@ def build_tile(tile: Tile, force=False):
     # tiles built before the cut are rebuilt
     osm_zones = {c: [z.code + ("~alps" if z.code in config.ALPS_CLIPPED.get(c, []) else "")
                      for z in zones if z.country == c] for c in config.OSM_ZONES}
-    fr_key = [c + ("~alps" if c in config.ALPS_CLIPPED["fr"] else "") for c in depts]
+    # Departments, marked when cut to the Alps or still without OpenStreetMap rock
+    fr_key = [c + ("~alps" if c in config.ALPS_CLIPPED["fr"] else "") + ("" if france.has_rock(c) else "~norock")
+              for c in depts]
     # Format of the zones' OpenStreetMap data: a zone extracted again rebuilds its tiles
     osm_formats = sorted({osmzone.osm_format(z) for z in zones})
     if not force and status_file.exists():
