@@ -7,6 +7,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Swiss hiking routes running on roads were drawn as plain roads, so that most of them did not show
+  on the Plateau: these roads are now edged with the colour of the route (yellow, red or blue).
+- Download and build spent minutes on nothing: the Alps perimeter was widened again for every zone and
+  every tile, and the swissALTI3D catalogue was queried even when every tile was there. A download with
+  all the data present now takes seconds, and building the tiles of the Alps is faster.
+
 ## [0.7.0] - 2026-11-09
 
 ### Added

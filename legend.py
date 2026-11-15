@@ -101,6 +101,10 @@ BASE = [
     Cat("hike_t1", "line", 0x0F, 21, dashed("#E0A100", 2, 8, 3)),
     Cat("hike_t2", "line", 0x10, 21, dashed("#E2001A", 2, 8, 3)),
     Cat("hike_t3", "line", 0x11, 21, dashed("#0055C8", 2, 5, 4)),
+    # Roads carrying a hiking route: the road edged with the colour of the route
+    Cat("road_hike_t1", "line", 0x0B, 19, line("#FFFFFF", 2, "#E0A100", 2)),
+    Cat("road_hike_t2", "line", 0x0C, 19, line("#FFFFFF", 2, "#E2001A", 2)),
+    Cat("road_hike_t3", "line", 0x0D, 19, line("#FFFFFF", 2, "#0055C8", 2)),
     # French marked routes: GR (red-white) and other routes (yellow), drawn over the paths
     Cat("hike_gr", "line", 0x12, 20, bitmap_line("#D7191C", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 2)),
     Cat("hike_pr", "line", 0x13, 21, bitmap_line("#E0A100", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 2)),
@@ -188,6 +192,12 @@ LABELS = {  # key: (fr, de, it, en)
     "hike_t1": ("Chemin de randonnée", "Wanderweg", "Sentiero escursionistico", "Hiking trail"),
     "hike_t2": ("Chemin de montagne", "Bergwanderweg", "Sentiero di montagna", "Mountain trail"),
     "hike_t3": ("Chemin alpin", "Alpinwanderweg", "Sentiero alpino", "Alpine trail"),
+    "road_hike_t1": ("Route, chemin de randonnée", "Strasse, Wanderweg", "Strada, sentiero escursionistico",
+                     "Road, hiking trail"),
+    "road_hike_t2": ("Route, chemin de montagne", "Strasse, Bergwanderweg", "Strada, sentiero di montagna",
+                     "Road, mountain trail"),
+    "road_hike_t3": ("Route, chemin alpin", "Strasse, Alpinwanderweg", "Strada, sentiero alpino",
+                     "Road, alpine trail"),
     "hike_gr": ("Sentier GR", "Fernwanderweg GR", "Sentiero GR", "GR long-distance trail"),
     "hike_pr": ("Itinéraire balisé (FR)", "Markierter Wanderweg (FR)", "Itinerario segnalato (FR)", "Marked trail (FR)"),
     "rail": ("Chemin de fer", "Eisenbahn", "Ferrovia", "Railway"),
