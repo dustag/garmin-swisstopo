@@ -125,9 +125,15 @@ def main():
     print(f"Coverage {cov.name}: {len(cov.tiles)} tiles")
     # Swiss data, only when the coverage touches Switzerland
     if coverage.switzerland().intersects(tiles):
-        keys = needed_km_tiles(cov)
         config.ALTI_DIR.mkdir(parents=True, exist_ok=True)
-        todo = {k: h for k, h in alti3d_urls(cov, keys).items() if not (config.ALTI_DIR / f"{k}.tif").exists()}
+        # km2 cells without swissALTI3D (abroad), found by earlier catalogue queries
+        absent_file = config.DOWNLOAD_DIR / "alti3d_absent.json"
+        absent = set(json.loads(absent_file.read_text())) if absent_file.exists() else set()
+        keys = {k for k in needed_km_tiles(cov) if k not in absent and not (config.ALTI_DIR / f"{k}.tif").exists()}
+        todo = {}
+        if keys:   # the catalogue query alone takes a minute or more: only when needed
+            todo = alti3d_urls(cov, keys)
+            absent_file.write_text(json.dumps(sorted(absent | (keys - set(todo)))))
         print(f"swissALTI3D: {len(todo)} km2 to fetch")
         with ThreadPoolExecutor(args.jobs) as pool:
             for i, _ in enumerate(pool.map(lambda kv: get_alti(*kv), todo.items()), 1):

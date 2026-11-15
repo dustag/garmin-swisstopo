@@ -4,6 +4,7 @@ The LV95 plane is cut into square tiles of config.TILE_SIZE. A tile is named
 after its south-west corner in km (e.g. "2570-1080") and gets a fixed 8-digit
 Garmin map id, so a tile built once can be reused by every coverage.
 """
+import functools
 import json
 import math
 import shutil
@@ -114,13 +115,28 @@ def alps():
     return geom
 
 
+@functools.cache
+def alps_area():
+    """Perimeter of the Alps widened by ALPS_MARGIN. Widening it takes a second or two: it is
+    done once and kept on disk."""
+    cache = config.DOWNLOAD_DIR / f"alps_perimeter_{config.ALPS_MARGIN}.wkb"
+    if cache.exists():
+        geom = shapely.from_wkb(cache.read_bytes())
+    else:
+        geom = alps().buffer(config.ALPS_MARGIN, quad_segs=4)
+        cache.write_bytes(shapely.to_wkb(geom))
+    shapely.prepare(geom)
+    return geom
+
+
 def clip_alps(country: str, code: str, geom):
     """Zone outline, cut to the Alps when the zone is mostly outside them (config.ALPS_CLIPPED)."""
     if code not in config.ALPS_CLIPPED.get(country, []):
         return geom
-    return shapely.intersection(shapely.make_valid(geom), alps().buffer(config.ALPS_MARGIN, quad_segs=4))
+    return shapely.intersection(shapely.make_valid(geom), alps_area())
 
 
+@functools.cache
 def dept_outline(code: str):
     """Part of a French department that is mapped (cut to the Alps for some departments)."""
     return clip_alps("fr", code, department(code))
