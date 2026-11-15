@@ -5,6 +5,7 @@ category defines its Garmin type, the minimum resolution at which it shows up
 (24 = most zoomed in) and how it is drawn. Legend labels are translated in
 LABELS and embedded in the TYP file for every supported language.
 """
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -92,22 +93,23 @@ BASE = [
     Cat("river", "line", 0x1F, 19, line("#3D8FD6", 2)),
 
     # Transport
-    Cat("road_major", "line", 0x02, 17, line("#F2A93B", 3, "#3C3C3C")),
+    # Main roads white and wide: the colours are left to the hiking routes
+    Cat("road_major", "line", 0x02, 17, line("#FFFFFF", 4, "#3C3C3C")),
     Cat("road", "line", 0x06, 19, line("#FFFFFF", 2, "#3C3C3C")),
     Cat("track", "line", 0x07, 21, line("#3C3C3C", 2)),
     Cat("path", "line", 0x16, 22, dashed("#3C3C3C", 1, 6, 3)),
     # Swiss hiking signage (yellow / white-red-white / white-blue-white); Italian
     # paths take the category matching their OpenStreetMap SAC scale
-    Cat("hike_t1", "line", 0x0F, 21, dashed("#E0A100", 2, 8, 3)),
-    Cat("hike_t2", "line", 0x10, 21, dashed("#E2001A", 2, 8, 3)),
-    Cat("hike_t3", "line", 0x11, 21, dashed("#0055C8", 2, 5, 4)),
-    # Roads carrying a hiking route: the road edged with the colour of the route
-    Cat("road_hike_t1", "line", 0x0B, 19, line("#FFFFFF", 2, "#E0A100", 2)),
-    Cat("road_hike_t2", "line", 0x0C, 19, line("#FFFFFF", 2, "#E2001A", 2)),
-    Cat("road_hike_t3", "line", 0x0D, 19, line("#FFFFFF", 2, "#0055C8", 2)),
+    Cat("hike_t1", "line", 0x0F, 21, dashed("#E0A100", 3, 8, 3)),
+    Cat("hike_t2", "line", 0x10, 21, dashed("#E2001A", 3, 8, 3)),
+    Cat("hike_t3", "line", 0x11, 21, dashed("#0055C8", 3, 5, 4)),
+    # Roads carrying a hiking route: filled with the colour of the route
+    Cat("road_hike_t1", "line", 0x0B, 19, line("#F5C400", 3, "#3C3C3C")),
+    Cat("road_hike_t2", "line", 0x0C, 19, line("#E2001A", 3, "#3C3C3C")),
+    Cat("road_hike_t3", "line", 0x0D, 19, line("#0055C8", 3, "#3C3C3C")),
     # French marked routes: GR (red-white) and other routes (yellow), drawn over the paths
-    Cat("hike_gr", "line", 0x12, 20, bitmap_line("#D7191C", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 2)),
-    Cat("hike_pr", "line", 0x13, 21, bitmap_line("#E0A100", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 2)),
+    Cat("hike_gr", "line", 0x12, 20, bitmap_line("#D7191C", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 3)),
+    Cat("hike_pr", "line", 0x13, 21, bitmap_line("#E0A100", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 3)),
     Cat("rail", "line", 0x14, 18, line("#202020", 2)),
     Cat("aerialway", "line", 0x1A, 20, bitmap_line("#202020", ["-" * 15 + "x" + "-" * 16, "x" * 32, "-" * 15 + "x" + "-" * 16])),
     Cat("powerline", "line", 0x29, 22, line("#8C8C8C", 1)),
@@ -246,8 +248,13 @@ def _strings(key: str, lang: str):
 # --- Generation ---------------------------------------------------------------------
 
 def _rule(c: Cat):
-    action = f" {{name '{c.name}'}}" if c.name else ""
-    return f"k={c.key}{action} [0x{c.type:x} resolution {c.res}]\n"
+    element = f"[0x{c.type:x} resolution {c.res}]"
+    if not c.name:
+        return f"k={c.key} {element}\n"
+    # A label only when the object has the tag it is made of: an empty label shows on the
+    # device as the first text of the map, its copyright message
+    tag = re.search(r"\$\{(\w+)", c.name)[1]
+    return f"k={c.key} & {tag}=* {{name '{c.name}'}} {element}\nk={c.key} {element}\n"
 
 
 def write_style(map_key: str, out_dir: Path, levels: str):

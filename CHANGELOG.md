@@ -7,6 +7,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The device ignored the colours and patterns of the maps: the TYP file inside them was named
+  `BASE.TYP.TYP`, not a valid Garmin name, and Garmin's default styles were drawn instead. Among
+  others, the hiking trails, which have no default style, did not show at all.
+- Unnamed lines (railways, streams…) showed the copyright message as their label.
+
+### Changed
+
+- Roads carrying a hiking route are filled with its colour (yellow, red or blue) instead of being edged;
+  main roads are white and wide, so as not to be mistaken for them.
+- Hiking trails are drawn one pixel wider.
+
 ## [0.7.1] - 2026-11-15
 
 ### Fixed
