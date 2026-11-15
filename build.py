@@ -532,7 +532,9 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
     style = work / f"style_{layer_key}"
     legend.write_style(layer_key, style, LEVELS)
     family_id = cov.family_id + dict(LAYERS)[layer_key]
-    typ = work / f"{layer_key}.typ.txt"
+    # mkgmap names the TYP inside the map after this file: the name must be a valid 8.3 Garmin
+    # name, without a dot, or the device ignores the TYP and draws its own default styles
+    typ = work / f"{family_id}.txt"
     legend.write_typ(layer_key, typ, family_id, config.LANG)
 
     title = f"{config.FAMILY_NAME} {layer_key} {cov.name}"
