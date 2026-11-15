@@ -30,7 +30,7 @@ the maps.
 
 | Map | Content | When to use it |
 |---|---|---|
-| `swisstopo_<coverage>_base.img` | Contour lines (10/50/100 m), rock, scree, glaciers, forest, water, buildings, roads, paths with the Swiss hiking colours (yellow / red / blue), aerial ropeways, summits with elevation, passes, huts, place names, hill shading | All year |
+| `swisstopo_<coverage>_base.img` | Contour lines (10/50/100 m), rock, scree, glaciers, forest, water, buildings, roads, paths with the Swiss hiking colours (yellow / red / blue), roads carrying a hiking route edged with its colour, aerial ropeways, summits with elevation, passes, huts, place names, hill shading | All year |
 | `swisstopo_<coverage>_hiver.img` | Transparent overlay: slope classes 30-35° / 35-40° / 40-45° / > 45°, ski touring network with uphill/downhill arrows, "on foot" and "increased caution" sections, route numbers with SAC grade, snowshoe routes, wildlife quiet zones and protection areas with their allowed routes | Winter |
 
 Outside Switzerland the content is as close as the open data allows:

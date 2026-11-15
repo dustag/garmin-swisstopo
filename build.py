@@ -47,6 +47,7 @@ SNOWSHOE = config.DOWNLOAD_DIR / "schneeschuhrouten_2056.gpkg"
 DEM_RES = 5.0     # m
 DEM_MARGIN = 100  # m of terrain read around a tile, so contours and slopes match across tiles
 TILE_FORMAT = 3   # bump to invalidate already built tiles when the tile content changes
+CH_FORMAT = 2     # the same, for the Swiss content only (tiles without Switzerland are kept)
 
 
 # --- Digital elevation model -----------------------------------------------------
@@ -254,9 +255,12 @@ def write_base(ctx: TileContext, osm: OsmWriter):
         if kb == "Tunnel" or art not in ROADS:
             continue
         key = ROADS[art]
-        # Paths and tracks take the colour of their hiking category
+        # Paths and tracks take the colour of their hiking category; roads that carry a hiking
+        # route (most of them on the Plateau) are edged with it
         if key in ("track", "path") and hike in HIKING:
             key = HIKING[hike]
+        elif key in ("road", "road_major") and hike in HIKING:
+            key = "road_" + HIKING[hike]
         osm.add(clip(g), {"k": key, "name": name if key.startswith("road") else None})
 
     df = ctx.read("tlm_gewaesser_fliessgewaesser", ["objektart", "verlauf", "name"])
@@ -422,17 +426,19 @@ def build_tile(tile: Tile, force=False):
               for c in depts]
     # Format of the zones' OpenStreetMap data: a zone extracted again rebuilds its tiles
     osm_formats = sorted({osmzone.osm_format(z) for z in zones})
+    in_ch = coverage.switzerland().intersects(shapely.box(*tile.bounds))
+    ch_key = CH_FORMAT if in_ch else None
     if not force and status_file.exists():
         status = json.loads(status_file.read_text())
-        if ((status.get("format"), status.get("lang"), status.get("fr", []), status.get("osm", []))
-                == (TILE_FORMAT, config.LANG, fr_key, osm_formats)
+        if ((status.get("format"), status.get("lang"), status.get("fr", []), status.get("osm", []),
+             status.get("ch"))
+                == (TILE_FORMAT, config.LANG, fr_key, osm_formats, ch_key)
                 and all(status.get(c, []) == codes for c, codes in osm_zones.items())):
             return status | {"cached": True}
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
 
     ctx = TileContext(tile)
-    in_ch = coverage.switzerland().intersects(shapely.box(*tile.bounds))
     french = [ft for ft in (france.FrenchTile(ctx, c) for c in depts) if not ft.empty]
     others = []
     if zones:
@@ -468,7 +474,7 @@ def build_tile(tile: Tile, force=False):
         counts["hiver"] = osm.count
     if dem.ok:
         np.savez_compressed(out / "hgt.npz", **hgt_samples(dem, tile))
-    status = {"tile": tile.name, "format": TILE_FORMAT, "lang": config.LANG, "fr": fr_key, **osm_zones, "osm": osm_formats,
+    status = {"tile": tile.name, "format": TILE_FORMAT, "lang": config.LANG, "fr": fr_key, **osm_zones, "osm": osm_formats, "ch": ch_key,
               "counts": counts}
     status_file.write_text(json.dumps(status))
     return status

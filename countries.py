@@ -8,6 +8,7 @@ terrain model of each zone.
 - Spain: NUTS 3 provinces (e.g. ES241); terrain MDT 5 m of the IGN.
 - Andorra: AD; terrain Copernicus GLO-30.
 """
+import functools
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -52,14 +53,10 @@ class Zone:
 
     def outline(self):
         """Mapped part of the zone (cut to the Alps for the zones mostly outside them)."""
-        if self.country == "it":
-            geom = coverage.italy_zone(self.code)
-        else:
-            geom = coverage.nuts_zone(self.country, self.code)
-        return coverage.clip_alps(self.country, self.code, geom)
+        return _outline(self.country, self.code)
 
     def area(self):
-        return self.outline().buffer(ZONE_MARGIN)
+        return _area(self.country, self.code)
 
     @property
     def extract(self) -> str:
@@ -87,6 +84,23 @@ class Zone:
         if self.country == "es":
             return demsrc.spain
         return demsrc.copernicus
+
+
+# Outlines are used for every tile: they are computed once per process
+@functools.cache
+def _outline(country, code):
+    if country == "it":
+        geom = coverage.italy_zone(code)
+    else:
+        geom = coverage.nuts_zone(country, code)
+    return coverage.clip_alps(country, code, geom)
+
+
+@functools.cache
+def _area(country, code):
+    geom = _outline(country, code).buffer(ZONE_MARGIN)
+    shapely.prepare(geom)
+    return geom
 
 
 def configured() -> list[Zone]:
