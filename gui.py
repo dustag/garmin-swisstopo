@@ -459,6 +459,8 @@ class MainWindow(QMainWindow):
         form.addRow(self.labels["Cartes"], map_choice)
         form.addRow(self.labels["Langue"], self.lang)
         form.addRow("", self.dem)
+        self.basecamp = QCheckBox(checked=s.value("basecamp", False, type=bool))
+        form.addRow("", self.basecamp)
         form.addRow(self.labels["Dossier des données"], self.data_dir)
         form.addRow(self.labels["Dossier des cartes"], self.output_dir)
         form.addRow("", self.show_advanced)
@@ -569,6 +571,9 @@ class MainWindow(QMainWindow):
                                   "réserves naturelles :\nsurcouche transparente à afficher par-dessus la carte de base"))
         self.lang.setToolTip(tr("Langue de la fenêtre et des étiquettes de la carte"))
         self.dem.setText(tr("Ombrage du relief"))
+        self.basecamp.setText(tr("Aussi pour Garmin BaseCamp"))
+        self.basecamp.setToolTip(tr("Copie de la carte à afficher dans BaseCamp sur le PC (dossier basecamp des "
+                                    "cartes), à copier dans C:\\ProgramData\\Garmin\\Maps"))
         self.output_dir.edit.setPlaceholderText(tr("dans le dossier des données"))
         self.show_advanced.setText(tr("Afficher les options avancées"))
         self.advanced.setTitle(tr("Avancé"))
@@ -599,6 +604,7 @@ class MainWindow(QMainWindow):
         s.setValue("lang", self.lang.currentData())
         s.setValue("maps", self.maps())
         s.setValue("dem", self.dem.isChecked())
+        s.setValue("basecamp", self.basecamp.isChecked())
         s.setValue("data_dir", self.data_dir.text())
         s.setValue("output_dir", self.output_dir.text())
         s.setValue("java", self.java.text())
@@ -662,6 +668,8 @@ class MainWindow(QMainWindow):
         build_args = ["--coverage", spec, "--jobs", str(self.jobs.value()), "--maps", *self.maps()]
         if not self.dem.isChecked():
             build_args.append("--no-dem")
+        if self.basecamp.isChecked():
+            build_args.append("--basecamp")
         if self.force.isChecked():
             build_args.append("--force")
         self.steps = [("Téléchargement des données…", "download", ["--coverage", spec]),

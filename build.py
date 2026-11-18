@@ -3,6 +3,7 @@
     python build.py                          # coverage from .env
     python build.py --coverage canton:VS     # area, switzerland, canton:XX, dept:NN, it:XX, at:XX, alpes...
     python build.py --no-dem                 # without hill shading
+    python build.py --basecamp               # also a copy for Garmin BaseCamp (output/basecamp)
     python build.py --maps hiver             # only the winter overlay (base, hiver or both)
     python build.py --step osm               # only build the tiles (OSM / elevation samples)
     python build.py --step mkgmap            # only compile (tiles already built)
@@ -48,7 +49,7 @@ SKI = config.DOWNLOAD_DIR / "skitouren_2056.gpkg"
 SNOWSHOE = config.DOWNLOAD_DIR / "schneeschuhrouten_2056.gpkg"
 DEM_RES = 5.0     # m
 DEM_MARGIN = 100  # m of terrain read around a tile, so contours and slopes match across tiles
-TILE_FORMAT = 3   # bump to invalidate already built tiles when the tile content changes
+TILE_FORMAT = 4   # bump to invalidate already built tiles when the tile content changes
 CH_FORMAT = 2     # the same, for the Swiss content only (tiles without Switzerland are kept)
 
 
@@ -539,7 +540,7 @@ NO_CONSOLE = ({"creationflags": subprocess.CREATE_NO_WINDOW, "stdout": sys.stdou
               if os.name == "nt" and not (sys.stdout and sys.stdout.isatty()) else {})
 
 
-def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
+def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None, basecamp=False):
     work = config.WORK_DIR / "coverages" / cov.name
     out = work / f"img_{layer_key}"
     shutil.rmtree(out, ignore_errors=True)
@@ -565,6 +566,9 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
             # Both maps are transparent: the base map is made opaque by its "land"
             # polygon over Switzerland only, so other maps still show abroad.
             "transparent"]
+    if basecamp:
+        # The map also in the format BaseCamp installs (a .gmap folder), next to gmapsupp.img
+        opts.append("gmapi")
     if dem_dir:
         opts += [f"dem={dem_dir}", f"dem-dists={DEM_DISTS}", "show-profiles=1"]
     inputs = 0
@@ -590,6 +594,11 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(out / "gmapsupp.img", dest)
     print(f"  -> {dest} ({dest.stat().st_size / 1e6:.1f} MB)")
+    for gmap in out.glob("*.gmap"):
+        target = config.OUTPUT_DIR / "basecamp" / gmap.name
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.copytree(gmap, target)
+        print(f"  -> {target} (BaseCamp)")
 
 
 def main():
@@ -598,6 +607,8 @@ def main():
                     help="area, switzerland, canton:XX[,YY], dept:NN, it/at/de/es[:XX], ad, bbox:E0,N0,E1,N1 "
                          "or alias (alpes, pyrenees)")
     ap.add_argument("--no-dem", action="store_true", help="without hill shading")
+    ap.add_argument("--basecamp", action="store_true",
+                    help="also a copy for Garmin BaseCamp, in OUTPUT_DIR/basecamp (copy it to C:\\ProgramData\\Garmin\\Maps)")
     ap.add_argument("--maps", nargs="+", choices=["base", "hiver"], default=["base", "hiver"],
                     help="maps to compile: base map, winter overlay or both")
     ap.add_argument("--step", choices=["all", "osm", "mkgmap"], default="all")
@@ -618,10 +629,10 @@ def main():
                 dem_dir = config.WORK_DIR / "coverages" / cov.name / "hgt"
                 assemble_hgt(cov, dem_dir)
             print("mkgmap base...")
-            mkgmap(cov, "base", args.jobs, dem_dir)
+            mkgmap(cov, "base", args.jobs, dem_dir, args.basecamp)
         if "hiver" in args.maps:
             print("mkgmap winter...")
-            mkgmap(cov, "hiver", args.jobs)
+            mkgmap(cov, "hiver", args.jobs, basecamp=args.basecamp)
 
 
 if __name__ == "__main__":

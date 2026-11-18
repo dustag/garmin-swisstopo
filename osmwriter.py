@@ -14,6 +14,10 @@ import shapely
 from pyproj import Transformer
 
 _LV95_TO_WGS84 = Transformer.from_crs(2056, 4326, always_xy=True)
+# Categories simplified before writing (tolerance in m). Building footprints carry many
+# vertices along their sides; rounded one by one to the Garmin grid (~2.4 m), they would turn
+# straight sides into zigzags: only their corners are kept.
+SIMPLIFY = {"building": 1.0}
 
 
 def to_wgs84(geom):
@@ -35,7 +39,9 @@ class OsmWriter:
 
     @staticmethod
     def _tags(tags):
-        return "".join(f"<tag k={quoteattr(k)} v={quoteattr(str(v))}/>" for k, v in tags.items() if v not in (None, ""))
+        # Missing values (None, empty, NaN from pandas) are left out
+        return "".join(f"<tag k={quoteattr(k)} v={quoteattr(str(v))}/>" for k, v in tags.items()
+                       if v is not None and v != "" and v == v)
 
     def _write_nodes(self, coords):
         ids = []
@@ -83,6 +89,8 @@ class OsmWriter:
         """Dispatch on geometry type."""
         if geom is None or geom.is_empty:
             return
+        if tags.get("k") in SIMPLIFY:
+            geom = shapely.simplify(geom, SIMPLIFY[tags["k"]], preserve_topology=True)
         self.count += 1
         kind = geom.geom_type
         if "Point" in kind:

@@ -7,6 +7,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-18
+
+### Added
+
+- `build.py --basecamp`, and **Aussi pour Garmin BaseCamp** in the window: the maps are also written as
+  `.gmap` folders (`OUTPUT_DIR/basecamp`) to view them in BaseCamp on the PC.
+- README: how to view the maps on a PC, with QMapShack or BaseCamp.
+
+### Fixed
+
+- Buildings had wavy, odd shapes: their many vertices along the sides were each rounded to the Garmin
+  grid (about 2.4 m). They are now simplified to their corners (1 m tolerance) before writing; all tiles
+  are rebuilt once.
+- Unnamed roads showed "NAN" as their label.
+
 ## [0.7.2] - 2026-11-18
 
 ### Fixed
@@ -204,7 +219,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.6.0...v0.7.0
