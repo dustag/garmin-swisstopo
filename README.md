@@ -251,6 +251,7 @@ Both scripts take the coverage from `.env` or from `--coverage`. `build.py` has 
 ```powershell
 python build.py --coverage canton:VS     # build another coverage
 python build.py --no-dem                 # no hill shading (smaller map)
+python build.py --basecamp               # also a copy for Garmin BaseCamp (see "Viewing the maps on a PC")
 python build.py --maps hiver             # only the winter overlay (base, hiver or both)
 python build.py --step osm               # only build the tiles
 python build.py --step mkgmap            # only compile (after editing legend.py, for example)
@@ -442,6 +443,22 @@ only requires running `download.py` and `build.py --force` again.
 | Slope stipple hides the terrain | Turn the winter overlay off for the activity, or change `STIPPLE` in `legend.py` to a sparser pattern |
 | No 10 m contour lines or labels | They only appear at the closest zoom levels; set Detail to *More* or *Most* |
 | Two coverages look mixed up | They share tiles (for example an area and its canton): install only one of them |
+
+---
+
+## Viewing the maps on a PC
+
+BaseCamp cannot show the maps stored on the watch: it reaches the fēnix through MTP, and only shows the maps
+installed on the PC.
+
+- **QMapShack** (free, [releases](https://github.com/Maproom/qmapshack/releases)) opens the `.img` files
+  directly, with their colours and hill shading: in its *Maps* panel, right click → *Setup map paths*, add
+  `OUTPUT_DIR`, then tick the maps. The winter overlay can be shown on top of the base map.
+- **Garmin BaseCamp**: build with `--basecamp` (or tick **Aussi pour Garmin BaseCamp** in the window). Each
+  map is then also written as a `.gmap` folder in `OUTPUT_DIR/basecamp`; copy these folders to
+  `C:\ProgramData\Garmin\Maps` (Windows) or `~/Library/Application Support/Garmin/Maps` (macOS) and restart
+  BaseCamp: they appear in its *Maps* menu. BaseCamp shows one map at a time, so the winter overlay is shown
+  alone.
 
 ---
 

@@ -19,6 +19,16 @@ TEXTS = {
     "Tout désélectionner": {"de": "Auswahl aufheben", "it": "Deseleziona tutto", "en": "Clear selection"},
     "Recentrer": {"de": "Zentrieren", "it": "Ricentra", "en": "Recenter"},
     "Pyrénées": {"de": "Pyrenäen", "it": "Pirenei", "en": "Pyrenees"},
+    "Aussi pour Garmin BaseCamp": {"de": "Auch für Garmin BaseCamp", "it": "Anche per Garmin BaseCamp",
+                                   "en": "Also for Garmin BaseCamp"},
+    "Copie de la carte à afficher dans BaseCamp sur le PC (dossier basecamp des cartes), à copier dans "
+    "C:\\ProgramData\\Garmin\\Maps": {
+        "de": "Kopie der Karte zur Anzeige in BaseCamp auf dem PC (Ordner basecamp der Karten), "
+              "nach C:\\ProgramData\\Garmin\\Maps zu kopieren",
+        "it": "Copia della carta da mostrare in BaseCamp sul PC (cartella basecamp delle carte), "
+              "da copiare in C:\\ProgramData\\Garmin\\Maps",
+        "en": "Copy of the map to show in BaseCamp on the PC (basecamp folder of the maps), "
+              "to copy to C:\\ProgramData\\Garmin\\Maps"},
     "Aucune zone sélectionnée.": {"de": "Kein Gebiet ausgewählt.", "it": "Nessuna zona selezionata.",
                                   "en": "No area selected."},
     "Surface : <b>{area} km²</b>": {"de": "Fläche: <b>{area} km²</b>", "it": "Superficie: <b>{area} km²</b>",
