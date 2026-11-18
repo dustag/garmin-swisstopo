@@ -35,7 +35,9 @@ class OsmWriter:
 
     @staticmethod
     def _tags(tags):
-        return "".join(f"<tag k={quoteattr(k)} v={quoteattr(str(v))}/>" for k, v in tags.items() if v not in (None, ""))
+        # Missing values (None, empty, NaN from pandas) are left out
+        return "".join(f"<tag k={quoteattr(k)} v={quoteattr(str(v))}/>" for k, v in tags.items()
+                       if v is not None and v != "" and v == v)
 
     def _write_nodes(self, coords):
         ids = []

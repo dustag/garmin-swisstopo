@@ -254,7 +254,8 @@ def _rule(c: Cat):
     # A label only when the object has the tag it is made of: an empty label shows on the
     # device as the first text of the map, its copyright message
     tag = re.search(r"\$\{(\w+)", c.name)[1]
-    return f"k={c.key} & {tag}=* {{name '{c.name}'}} {element}\nk={c.key} {element}\n"
+    # ("nan": missing names written by tiles built before 0.7.3)
+    return f"k={c.key} & {tag}=* & {tag}!=nan {{name '{c.name}'}} {element}\nk={c.key} {element}\n"
 
 
 def write_style(map_key: str, out_dir: Path, levels: str):
