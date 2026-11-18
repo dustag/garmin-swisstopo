@@ -7,12 +7,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-18
+
 ### Fixed
 
 - The device ignored the colours and patterns of the maps: the TYP file inside them was named
   `BASE.TYP.TYP`, not a valid Garmin name, and Garmin's default styles were drawn instead. Among
   others, the hiking trails, which have no default style, did not show at all.
 - Unnamed lines (railways, streams…) showed the copyright message as their label.
+- A network drop during a build made the Swiss tiles fail: the requests for the wildlife zones now wait
+  and try again.
 
 ### Changed
 
@@ -200,7 +204,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.5.0...v0.6.0
