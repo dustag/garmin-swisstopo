@@ -17,7 +17,9 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import traceback
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -359,6 +361,19 @@ def write_ski(ctx: TileContext, osm: OsmWriter, dem: Dem):
 WILDLIFE_LAYERS = {"ch.bafu.wrz-wildruhezonen_portal": "wrz_name", "ch.bafu.wrz-jagdbanngebiete_select": "jb_name"}
 
 
+def _get_json(url, attempts=6):
+    """JSON from a web service, waiting through network drops (a whole build makes thousands
+    of requests)."""
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r:
+                return json.load(r)
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == attempts - 1:
+                raise
+            time.sleep(30 * (attempt + 1))
+
+
 def fetch_wildlife(bbox):
     """Wildlife quiet zones and protection areas from the geo.admin API (paged)."""
     feats = []
@@ -369,7 +384,7 @@ def fetch_wildlife(bbox):
                 "geometryType": "esriGeometryEnvelope", "geometry": ",".join(map(str, bbox)),
                 "layers": f"all:{layer}", "tolerance": 0, "sr": 2056, "geometryFormat": "geojson",
                 "limit": 50, "offset": offset})
-            res = json.load(urllib.request.urlopen(f"{config.GEOADMIN_API}/identify?{q}"))["results"]
+            res = _get_json(f"{config.GEOADMIN_API}/identify?{q}")["results"]
             feats += [(layer, r) for r in res]
             if len(res) < 50:
                 break
@@ -532,7 +547,9 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None):
     style = work / f"style_{layer_key}"
     legend.write_style(layer_key, style, LEVELS)
     family_id = cov.family_id + dict(LAYERS)[layer_key]
-    typ = work / f"{layer_key}.typ.txt"
+    # mkgmap names the TYP inside the map after this file: the name must be a valid 8.3 Garmin
+    # name, without a dot, or the device ignores the TYP and draws its own default styles
+    typ = work / f"{family_id}.txt"
     legend.write_typ(layer_key, typ, family_id, config.LANG)
 
     title = f"{config.FAMILY_NAME} {layer_key} {cov.name}"
