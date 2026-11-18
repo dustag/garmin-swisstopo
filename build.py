@@ -17,7 +17,9 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import traceback
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -359,6 +361,19 @@ def write_ski(ctx: TileContext, osm: OsmWriter, dem: Dem):
 WILDLIFE_LAYERS = {"ch.bafu.wrz-wildruhezonen_portal": "wrz_name", "ch.bafu.wrz-jagdbanngebiete_select": "jb_name"}
 
 
+def _get_json(url, attempts=6):
+    """JSON from a web service, waiting through network drops (a whole build makes thousands
+    of requests)."""
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r:
+                return json.load(r)
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == attempts - 1:
+                raise
+            time.sleep(30 * (attempt + 1))
+
+
 def fetch_wildlife(bbox):
     """Wildlife quiet zones and protection areas from the geo.admin API (paged)."""
     feats = []
@@ -369,7 +384,7 @@ def fetch_wildlife(bbox):
                 "geometryType": "esriGeometryEnvelope", "geometry": ",".join(map(str, bbox)),
                 "layers": f"all:{layer}", "tolerance": 0, "sr": 2056, "geometryFormat": "geojson",
                 "limit": 50, "offset": offset})
-            res = json.load(urllib.request.urlopen(f"{config.GEOADMIN_API}/identify?{q}"))["results"]
+            res = _get_json(f"{config.GEOADMIN_API}/identify?{q}")["results"]
             feats += [(layer, r) for r in res]
             if len(res) < 50:
                 break
