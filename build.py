@@ -49,7 +49,7 @@ SKI = config.DOWNLOAD_DIR / "skitouren_2056.gpkg"
 SNOWSHOE = config.DOWNLOAD_DIR / "schneeschuhrouten_2056.gpkg"
 DEM_RES = 5.0     # m
 DEM_MARGIN = 100  # m of terrain read around a tile, so contours and slopes match across tiles
-TILE_FORMAT = 3   # bump to invalidate already built tiles when the tile content changes
+TILE_FORMAT = 4   # bump to invalidate already built tiles when the tile content changes
 CH_FORMAT = 2     # the same, for the Swiss content only (tiles without Switzerland are kept)
 
 

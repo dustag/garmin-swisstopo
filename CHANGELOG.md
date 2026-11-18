@@ -7,6 +7,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `build.py --basecamp`, and **Aussi pour Garmin BaseCamp** in the window: the maps are also written as
+  `.gmap` folders (`OUTPUT_DIR/basecamp`) to view them in BaseCamp on the PC.
+- README: how to view the maps on a PC, with QMapShack or BaseCamp.
+
+### Fixed
+
+- Buildings had wavy, odd shapes: their many vertices along the sides were each rounded to the Garmin
+  grid (about 2.4 m). They are now simplified to their corners (1 m tolerance) before writing; all tiles
+  are rebuilt once.
+- Unnamed roads showed "NAN" as their label.
+
 ## [0.7.2] - 2026-11-18
 
 ### Fixed
