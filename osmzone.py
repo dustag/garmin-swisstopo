@@ -174,6 +174,12 @@ def _osm_points(pbf, mask):
     return out.assign(geometry=df.geometry)[k.notna()]
 
 
+def extract_url(extract: str) -> str:
+    """URL of a Geofabrik extract, e.g. europe/italy/nord-ovest: each one sits in its own folder
+    (the former europe/italy/nord-ovest-latest.osm.pbf is gone)."""
+    return f"{config.GEOFABRIK}/{extract}/{extract.rsplit('/', 1)[-1]}-latest.osm.pbf"
+
+
 def osm_format(zone) -> int:
     """Format of the zone's extracted data (1: before the format was recorded)."""
     f = zone.dir / "osm.format"
@@ -195,7 +201,7 @@ def download_osm(zones, fetch):
             by_extract.setdefault(z.extract, []).append(z)
     for extract, group in by_extract.items():
         name = extract.rsplit("/", 1)[-1]
-        pbf = fetch(f"{config.GEOFABRIK}/{extract}-latest.osm.pbf", config.DOWNLOAD_DIR / "osm" / f"{name}.osm.pbf")
+        pbf = fetch(extract_url(extract), config.DOWNLOAD_DIR / "osm" / f"{name}.osm.pbf")
         areas = {z: z.area() for z in group}
         mask = _to_wgs84(shapely.union_all(list(areas.values())).simplify(200))
         print(f"  OpenStreetMap {name}: reading {', '.join(z.code for z in group)} (several minutes)")

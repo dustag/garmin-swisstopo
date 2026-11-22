@@ -31,8 +31,24 @@ import osmzone
 LEGACY_2M_DIR = config.DOWNLOAD_DIR / "alti3d"   # 2 m tiles kept by earlier versions
 
 
-def fetch(url: str, dest: Path, quiet=False) -> Path:
-    """Download url to dest, resuming a partial transfer if any."""
+def fetch(url: str, dest: Path, quiet=False, attempts=6) -> Path:
+    """Download url to dest, resuming a partial transfer if any; waits and tries again while
+    the server is busy or down (Geofabrik, IGN...) or the network drops."""
+    for attempt in range(attempts):
+        try:
+            return _fetch(url, dest, quiet)
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 500, 502, 503, 504) or attempt == attempts - 1:
+                raise
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == attempts - 1:
+                raise
+        if not quiet:
+            print(f"  {dest.name}: server or network unavailable, trying again in {60 * (attempt + 1)} s")
+        time.sleep(60 * (attempt + 1))
+
+
+def _fetch(url: str, dest: Path, quiet: bool) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     # Some servers (IGN) reject Python's default user agent
     headers = {"User-Agent": config.USER_AGENT}
