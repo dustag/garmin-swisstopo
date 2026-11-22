@@ -46,11 +46,13 @@ class Tile:
         return (self.e, self.n, self.e + config.TILE_SIZE, self.n + config.TILE_SIZE)
 
     def map_id(self, layer: int):
-        """8-digit Garmin map id; layer 0 = base, 1 = winter overlay."""
+        """8-digit Garmin map id; layer 0 = base, 1 = winter overlay, 2 = cycling overlay."""
         row = (self.n - N_ORIGIN) // config.TILE_SIZE
         if not -N_ROWS // 2 <= row < N_ROWS // 2:
             raise ValueError(f"tile {self.name} is too far north or south of the grid origin")
         index = ((self.e - E_ORIGIN) // config.TILE_SIZE) * N_ROWS + row
+        if layer == 2:   # its own range: the base and winter ids take 2 * index + 0 or 1
+            return 68200000 + index
         return 65200000 + 2 * index + layer
 
 

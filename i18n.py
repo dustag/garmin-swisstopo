@@ -19,6 +19,15 @@ TEXTS = {
     "Tout désélectionner": {"de": "Auswahl aufheben", "it": "Deseleziona tutto", "en": "Clear selection"},
     "Recentrer": {"de": "Zentrieren", "it": "Ricentra", "en": "Recenter"},
     "Pyrénées": {"de": "Pyrenäen", "it": "Pirenei", "en": "Pyrenees"},
+    "Vélo (surcouche)": {"de": "Velo (Überlagerung)", "it": "Bici (sovrapposizione)", "en": "Cycling (overlay)"},
+    "Itinéraires vélo et VTT (SuisseMobile en Suisse, OpenStreetMap ailleurs) :\n"
+    "surcouche transparente à afficher par-dessus la carte de base": {
+        "de": "Velo- und Mountainbikerouten (SchweizMobil in der Schweiz, sonst OpenStreetMap):\n"
+              "transparente Überlagerung, die über der Grundkarte angezeigt wird",
+        "it": "Itinerari per bici e MTB (SvizzeraMobile in Svizzera, altrove OpenStreetMap):\n"
+              "sovrapposizione trasparente da mostrare sopra la carta di base",
+        "en": "Cycling and mountain bike routes (SwitzerlandMobility in Switzerland, OpenStreetMap elsewhere):\n"
+              "transparent overlay shown on top of the base map"},
     "Aussi pour Garmin BaseCamp": {"de": "Auch für Garmin BaseCamp", "it": "Anche per Garmin BaseCamp",
                                    "en": "Also for Garmin BaseCamp"},
     "Copie de la carte à afficher dans BaseCamp sur le PC (dossier basecamp des cartes), à copier dans "
@@ -38,6 +47,7 @@ TEXTS = {
                                                    "en": "Estimated size: <b>≈ {size}</b> ({maps})"},
     "été": {"de": "Sommer", "it": "estate", "en": "summer"},
     "hiver": {"de": "Winter", "it": "inverno", "en": "winter"},
+    "vélo": {"de": "Velo", "it": "bici", "en": "cycling"},
     " et ": {"de": " und ", "it": " e ", "en": " and "},
     "Aucune carte choisie (été ou hiver).": {"de": "Keine Karte gewählt (Sommer oder Winter).",
                                              "it": "Nessuna carta scelta (estate o inverno).",

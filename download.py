@@ -23,6 +23,7 @@ import shapely
 
 import config
 import countries
+import cycling
 import coverage
 import demsrc
 import france
@@ -134,6 +135,8 @@ def main():
                     help="area, switzerland, canton:XX[,YY], dept:NN, it/at/de/es[:XX], ad, bbox:E0,N0,E1,N1 "
                          "or alias (alpes, pyrenees)")
     ap.add_argument("--jobs", type=int, default=8, help="parallel downloads")
+    ap.add_argument("--maps", nargs="+", choices=["base", "hiver", "velo"], default=["base", "hiver"],
+                    help="maps to build (the cycling overlay needs its own data)")
     args = ap.parse_args()
 
     cov = coverage.resolve(args.coverage)
@@ -182,6 +185,17 @@ def main():
     if zones:
         print(f"OpenStreetMap zones {', '.join(z.code for z in zones)}:")
         osmzone.download_zones(zones, fetch)
+
+    # Cycling routes: SwitzerlandMobility, and OpenStreetMap for the departments and zones
+    if "velo" in args.maps:
+        if coverage.switzerland().intersects(tiles):
+            cycling.download_swiss(fetch)
+        areas = [(france.dept_dir(c), coverage.dept_outline(c), cycling.FRANCE_EXTRACTS[c], c)
+                 for c in config.FRANCE_DEPTS if c in cycling.FRANCE_EXTRACTS
+                 and coverage.dept_outline(c).intersects(tiles)]
+        areas += [(z.dir, z.outline(), z.extract, z.code) for z in countries.configured()
+                  if z.area().intersects(tiles)]
+        cycling.download_osm(areas, fetch)
 
     # Already there in the packaged application, whose folder is read-only
     if not next(config.TOOLS_DIR.glob("mkgmap-latest/mkgmap-*/mkgmap.jar"), None):
