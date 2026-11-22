@@ -7,6 +7,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-22
+
 ### Added
 
 - Hiking overlay (`--maps rando`, **Randonnée (surcouche)** in the window, built by default): the hiking
@@ -255,7 +257,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-openmaps/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-openmaps/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/dustag/garmin-openmaps/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/dustag/garmin-openmaps/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/dustag/garmin-openmaps/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/dustag/garmin-openmaps/compare/v0.7.1...v0.7.2
