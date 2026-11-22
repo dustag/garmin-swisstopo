@@ -356,7 +356,7 @@ def _is_underground(position):
         return False
 
 
-def write_base(ft: FrenchTile, osm, dem):
+def write_base(ft: FrenchTile, osm, dem, rando):
     clip = ft.clip
     osm.add(ft.region, {"k": "land"})
 
@@ -392,14 +392,14 @@ def write_base(ft: FrenchTile, osm, dem):
             continue
         osm.add(clip(g), {"k": key, "name": name if key.startswith("road") else None})
 
-    # Hiking routes: GR (red-white) and other marked routes (yellow)
+    # Hiking routes, in the hiking overlay: GR (red-white) and other marked routes (yellow)
     df = ft.read("itineraire_autre", ["nature", "toponyme", "numero"])
     for g, nature, name, number in zip(df.geometry, df.nature, df.toponyme, df.numero):
         if nature != "Itinéraire de randonnée pédestre":
             continue
         label = number or name
         key = "hike_gr" if str(label or "").upper().startswith("GR") else "hike_pr"
-        osm.add(clip(g), {"k": key, "name": label})
+        rando.add(clip(g), {"k": key, "name": label})
 
     df = ft.read("troncon_hydrographique", ["nature", "position_par_rapport_au_sol"])
     for g, nature, pos in zip(df.geometry, df.nature, df.position_par_rapport_au_sol):

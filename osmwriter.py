@@ -109,7 +109,7 @@ class OsmWriter:
             f.close()
         opener = gzip.open if self.path.suffix == ".gz" else open
         with opener(self.path, "wt", encoding="utf-8") as out:
-            out.write("<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6' generator='swisstopo-garmin'>\n")
+            out.write("<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6' generator='garmin-openmaps'>\n")
             for p in self._parts:
                 with open(p, encoding="utf-8") as f:
                     shutil.copyfileobj(f, out)

@@ -247,6 +247,7 @@ def download_zones(zones, fetch):
 AREA_KEYS = {"forest", "scrub", "rock", "scree", "glacier", "wetland", "lake", "river_area", "building"}
 ROAD_KEYS = {"road_major", "road"}
 TRAIL_KEYS = {"path", "track", "hike_t1", "hike_t2", "hike_t3"}
+HIKE_KEYS = {"hike_t1", "hike_t2", "hike_t3"}   # paths with a SAC scale, in the hiking overlay
 
 
 WINTER_LINE_KEYS = {"ski_osm"}
@@ -312,7 +313,7 @@ class ZoneTile:
                 and (self.foreign.is_empty or shapely.distance(point, self.foreign) > 150))
 
 
-def write_base(zt: ZoneTile, osm, dem):
+def write_base(zt: ZoneTile, osm, dem, rando):
     clip = zt.clip
     osm.add(zt.region, {"k": "land"})
     for row in zt.read("areas").itertuples():
@@ -327,7 +328,12 @@ def write_base(zt: ZoneTile, osm, dem):
             name = row.ref if isinstance(row.ref, str) else None
         else:
             name = None
-        osm.add(clip(row.geometry), {"k": row.k, "name": name})
+        g = clip(row.geometry)
+        if row.k in HIKE_KEYS:   # a plain path in the base map, coloured by the hiking overlay
+            osm.add(g, {"k": "path", "name": name})
+            rando.add(g, {"k": row.k})
+        else:
+            osm.add(g, {"k": row.k, "name": name})
     for row in zt.read("points").itertuples():
         g, name = row.geometry, label(row)
         if not name or not zt.owns(g):

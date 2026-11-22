@@ -7,6 +7,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Hiking overlay (`--maps rando`, **Randonnée (surcouche)** in the window, built by default): the hiking
+  trails in yellow, red and blue, the roads carrying a hiking route, the French GR and marked routes,
+  and the paths mapped from OpenStreetMap after their SAC scale.
+- Configuration window: the title **OpenMaps for Garmin Watches**, in the window language, and an application
+  icon (a folded sports map, `packaging/make_icon.py`).
+
+### Changed
+
+- The hiking routes leave the base map for the hiking overlay: the base map draws plain paths and roads.
+  Enable *OpenMaps rando* with the base map in the hiking activities. All tiles are rebuilt once.
+- The project is renamed **garmin-openmaps**, its maps **OpenMaps** (`openmaps_<coverage>_<map>.img`): it
+  now covers far more than the swisstopo data. The default data folder becomes `openmaps-data`;
+  `swisstopo-data` is still used when it is there, and the window keeps its settings.
+
+### Fixed
+
+- Rebuilding a tile deleted its cycling overlay.
+
 ## [0.9.0] - 2026-11-22
 
 ### Added
@@ -235,15 +255,15 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.9.0...HEAD
-[0.9.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.8.0...v0.9.0
-[0.8.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.2...v0.8.0
-[0.7.2]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.1...v0.7.2
-[0.7.1]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.0...v0.7.1
-[0.7.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/dustag/garmin-swisstopo/releases/tag/v0.1.0
+[Unreleased]: https://github.com/dustag/garmin-openmaps/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/dustag/garmin-openmaps/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/dustag/garmin-openmaps/compare/v0.7.2...v0.8.0
+[0.7.2]: https://github.com/dustag/garmin-openmaps/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/dustag/garmin-openmaps/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/dustag/garmin-openmaps/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/dustag/garmin-openmaps/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/dustag/garmin-openmaps/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/dustag/garmin-openmaps/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/dustag/garmin-openmaps/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/dustag/garmin-openmaps/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/dustag/garmin-openmaps/releases/tag/v0.1.0

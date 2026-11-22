@@ -1,4 +1,4 @@
-"""Shared configuration for the Swisstopo -> Garmin (.img) pipeline.
+"""Shared configuration of the open data -> Garmin (.img) pipeline.
 
 Machine-specific paths and the default coverage are read from a `.env` file
 (see `.env.example`).
@@ -12,7 +12,9 @@ REPO_DIR = Path(__file__).resolve().parent
 load_dotenv(REPO_DIR / ".env")
 
 # Large data lives outside the repository
-DATA_DIR = Path(os.environ.get("DATA_DIR", Path.home() / "swisstopo-data")).expanduser()
+_OLD_DATA_DIR = Path.home() / "swisstopo-data"   # default before 0.10.0, kept when it is there
+DATA_DIR = Path(os.environ.get("DATA_DIR", _OLD_DATA_DIR if _OLD_DATA_DIR.exists()
+                               else Path.home() / "openmaps-data")).expanduser()
 DOWNLOAD_DIR = DATA_DIR / "download"
 ALTI_DIR = DOWNLOAD_DIR / "alti3d_5m"     # swissALTI3D resampled to 5 m, one file per km2
 FRANCE_DIR = DOWNLOAD_DIR / "fr"          # French data, one sub-directory per department
@@ -71,9 +73,11 @@ ITALY_FAMILY_ID = 6800
 OSM_FAMILY_ID = 9000
 # Combined coverages ("a+b"): family id = 7000 + 2 * (stable hash of the spec % 1000)
 COMBINED_FAMILY_ID = 7000
-# The cycling overlay of a coverage: its family id + VELO_FAMILY_OFFSET (base: +0, winter: +1)
+# The cycling and hiking overlays of a coverage: its family id + VELO_FAMILY_OFFSET or
+# RANDO_FAMILY_OFFSET (base: +0, winter: +1)
 VELO_FAMILY_OFFSET = 20000
-FAMILY_NAME = "Swisstopo"
+RANDO_FAMILY_OFFSET = 30000
+FAMILY_NAME = "OpenMaps"
 
 # Label language: fr, de, it or en. Place names always stay in their official local form.
 LANG = os.environ.get("LANG_LABELS", "fr").lower()
@@ -177,7 +181,7 @@ ALPS_PERIMETER = ("https://www.atlas.alpconv.org/geoserver/ows?service=WFS&versi
 OVERPASS = ["https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
             "https://overpass.kumi.systems/api/interpreter"]
 CAMPTOCAMP_API = "https://api.camptocamp.org"
-USER_AGENT = "swisstopo-garmin (https://github.com/dustag/garmin-swisstopo)"
+USER_AGENT = "garmin-openmaps (https://github.com/dustag/garmin-openmaps)"
 GEOADMIN_API = "https://api3.geo.admin.ch/rest/services/api/MapServer"
 SOURCES = {
     "tlm3d": "https://data.geo.admin.ch/ch.swisstopo.swisstlm3d/swisstlm3d_2026-02/swisstlm3d_2026-02_2056_5728.gpkg.zip",

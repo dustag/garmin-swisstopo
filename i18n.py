@@ -5,8 +5,10 @@ Texts are written in French in the code and looked up here.
 language = "fr"
 
 TEXTS = {
-    "Cartes Garmin swisstopo": {"de": "swisstopo-Karten für Garmin", "it": "Carte Garmin swisstopo",
-                                "en": "swisstopo Garmin maps"},
+    "Cartes Garmin OpenMaps": {"de": "OpenMaps-Karten für Garmin", "it": "Carte Garmin OpenMaps",
+                               "en": "OpenMaps Garmin maps"},
+    "OpenMaps pour montres Garmin": {"de": "OpenMaps für Garmin-Uhren", "it": "OpenMaps per orologi Garmin",
+                                     "en": "OpenMaps for Garmin Watches"},
     # Zones
     "Zones": {"de": "Gebiete", "it": "Zone", "en": "Areas"},
     "Cliquez sur la carte pour choisir les zones. Molette pour zoomer, glisser pour se déplacer.": {
@@ -19,6 +21,16 @@ TEXTS = {
     "Tout désélectionner": {"de": "Auswahl aufheben", "it": "Deseleziona tutto", "en": "Clear selection"},
     "Recentrer": {"de": "Zentrieren", "it": "Ricentra", "en": "Recenter"},
     "Pyrénées": {"de": "Pyrenäen", "it": "Pirenei", "en": "Pyrenees"},
+    "Randonnée (surcouche)": {"de": "Wandern (Überlagerung)", "it": "Escursionismo (sovrapposizione)",
+                              "en": "Hiking (overlay)"},
+    "Chemins de randonnée balisés (jaune, rouge, bleu), sentiers GR :\n"
+    "surcouche transparente à afficher par-dessus la carte de base": {
+        "de": "Markierte Wanderwege (gelb, rot, blau), GR-Wege:\n"
+              "transparente Überlagerung, die über der Grundkarte angezeigt wird",
+        "it": "Sentieri escursionistici segnalati (giallo, rosso, blu), sentieri GR:\n"
+              "sovrapposizione trasparente da mostrare sopra la carta di base",
+        "en": "Marked hiking trails (yellow, red, blue), GR trails:\n"
+              "transparent overlay shown on top of the base map"},
     "Vélo (surcouche)": {"de": "Velo (Überlagerung)", "it": "Bici (sovrapposizione)", "en": "Cycling (overlay)"},
     "Itinéraires vélo et VTT (SuisseMobile en Suisse, OpenStreetMap ailleurs) :\n"
     "surcouche transparente à afficher par-dessus la carte de base": {
@@ -48,6 +60,7 @@ TEXTS = {
     "été": {"de": "Sommer", "it": "estate", "en": "summer"},
     "hiver": {"de": "Winter", "it": "inverno", "en": "winter"},
     "vélo": {"de": "Velo", "it": "bici", "en": "cycling"},
+    "rando": {"de": "Wandern", "it": "escursionismo", "en": "hiking"},
     " et ": {"de": " und ", "it": " e ", "en": " and "},
     "Aucune carte choisie (été ou hiver).": {"de": "Keine Karte gewählt (Sommer oder Winter).",
                                              "it": "Nessuna carta scelta (estate o inverno).",

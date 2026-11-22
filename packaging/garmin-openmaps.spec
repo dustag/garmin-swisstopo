@@ -7,13 +7,13 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 ROOT = Path(SPECPATH).parent
-APP = "swisstopo-garmin"
+APP = "garmin-openmaps"
 
 a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
     pathex=[str(ROOT)],
     # GDAL and PROJ data of the wheels (osmconf.ini for the Italian OpenStreetMap extracts...)
-    datas=[(str(ROOT / f), ".") for f in ("zones.json", "relief.json", "relief_alps.png", "relief_pyrenees.png")]
+    datas=[(str(ROOT / f), ".") for f in ("zones.json", "relief.json", "relief_alps.png", "relief_pyrenees.png", "icon.png")]
           + collect_data_files("pyogrio") + collect_data_files("rasterio"),
     # Started by name from launcher.py; compiled modules imported from other compiled modules
     hiddenimports=["gui", "download", "build"] + collect_submodules("pyogrio") + collect_submodules("rasterio"),
@@ -27,6 +27,7 @@ exe = EXE(
     exclude_binaries=True,
     name=APP,
     console=False,
+    icon=str(ROOT / "packaging" / "icon.ico"),
 )
 coll = COLLECT(exe, a.binaries, a.datas, name=APP)
 
@@ -34,7 +35,8 @@ if sys.platform == "darwin":
     app = BUNDLE(
         coll,
         name=f"{APP}.app",
-        bundle_identifier="io.github.dustag.garmin-swisstopo",
+        icon=str(ROOT / "packaging" / "icon.icns"),
+        bundle_identifier="io.github.dustag.garmin-openmaps",
         version=os.environ.get("APP_VERSION", "0"),
         info_plist={"NSHighResolutionCapable": True, "LSApplicationCategoryType": "public.app-category.travel"},
     )

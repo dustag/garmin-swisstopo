@@ -135,7 +135,8 @@ def main():
                     help="area, switzerland, canton:XX[,YY], dept:NN, it/at/de/es[:XX], ad, bbox:E0,N0,E1,N1 "
                          "or alias (alpes, pyrenees)")
     ap.add_argument("--jobs", type=int, default=8, help="parallel downloads")
-    ap.add_argument("--maps", nargs="+", choices=["base", "hiver", "velo"], default=["base", "hiver"],
+    ap.add_argument("--maps", nargs="+", choices=["base", "hiver", "rando", "velo"],
+                    default=["base", "hiver", "rando"],
                     help="maps to build (the cycling overlay needs its own data)")
     args = ap.parse_args()
 
