@@ -23,6 +23,7 @@ import shapely
 
 import config
 import countries
+import cycling
 import coverage
 import demsrc
 import france
@@ -31,8 +32,24 @@ import osmzone
 LEGACY_2M_DIR = config.DOWNLOAD_DIR / "alti3d"   # 2 m tiles kept by earlier versions
 
 
-def fetch(url: str, dest: Path, quiet=False) -> Path:
-    """Download url to dest, resuming a partial transfer if any."""
+def fetch(url: str, dest: Path, quiet=False, attempts=6) -> Path:
+    """Download url to dest, resuming a partial transfer if any; waits and tries again while
+    the server is busy or down (Geofabrik, IGN...) or the network drops."""
+    for attempt in range(attempts):
+        try:
+            return _fetch(url, dest, quiet)
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 500, 502, 503, 504) or attempt == attempts - 1:
+                raise
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == attempts - 1:
+                raise
+        if not quiet:
+            print(f"  {dest.name}: server or network unavailable, trying again in {60 * (attempt + 1)} s")
+        time.sleep(60 * (attempt + 1))
+
+
+def _fetch(url: str, dest: Path, quiet: bool) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     # Some servers (IGN) reject Python's default user agent
     headers = {"User-Agent": config.USER_AGENT}
@@ -118,6 +135,8 @@ def main():
                     help="area, switzerland, canton:XX[,YY], dept:NN, it/at/de/es[:XX], ad, bbox:E0,N0,E1,N1 "
                          "or alias (alpes, pyrenees)")
     ap.add_argument("--jobs", type=int, default=8, help="parallel downloads")
+    ap.add_argument("--maps", nargs="+", choices=["base", "hiver", "velo"], default=["base", "hiver"],
+                    help="maps to build (the cycling overlay needs its own data)")
     args = ap.parse_args()
 
     cov = coverage.resolve(args.coverage)
@@ -166,6 +185,17 @@ def main():
     if zones:
         print(f"OpenStreetMap zones {', '.join(z.code for z in zones)}:")
         osmzone.download_zones(zones, fetch)
+
+    # Cycling routes: SwitzerlandMobility, and OpenStreetMap for the departments and zones
+    if "velo" in args.maps:
+        if coverage.switzerland().intersects(tiles):
+            cycling.download_swiss(fetch)
+        areas = [(france.dept_dir(c), coverage.dept_outline(c), cycling.FRANCE_EXTRACTS[c], c)
+                 for c in config.FRANCE_DEPTS if c in cycling.FRANCE_EXTRACTS
+                 and coverage.dept_outline(c).intersects(tiles)]
+        areas += [(z.dir, z.outline(), z.extract, z.code) for z in countries.configured()
+                  if z.area().intersects(tiles)]
+        cycling.download_osm(areas, fetch)
 
     # Already there in the packaged application, whose folder is read-only
     if not next(config.TOOLS_DIR.glob("mkgmap-latest/mkgmap-*/mkgmap.jar"), None):

@@ -44,8 +44,8 @@ LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "en": "Englis
 # Average size of a 10 km tile per map (base with hill shading), measured on the Switzerland +
 # Haute-Savoie (1.04 + 0.77 MB), Switzerland + Haute-Savoie + Italy (0.97 + 0.82 MB) and Alps
 # with Austria and the Allgäu (0.92 + 0.87 MB) maps
-MB_PER_TILE = {"base": 0.95, "hiver": 0.85}
-MAP_NAMES = {"base": "été", "hiver": "hiver"}
+MB_PER_TILE = {"base": 0.95, "hiver": 0.85, "velo": 0.03}
+MAP_NAMES = {"base": "été", "hiver": "hiver", "velo": "vélo"}
 # Regions with a selection button (texts translated in i18n.py)
 REGION_BUTTONS = {"jura": "Jura", "alpes-ouest": "Alpes occidentales", "alpes-est": "Alpes orientales"}
 PROGRESS = re.compile(r"\[?(\d+)\s*/\s*(\d+)\]?")
@@ -437,17 +437,19 @@ class MainWindow(QMainWindow):
             self.lang.addItem(name, code)
         self.lang.setCurrentIndex(list(LANGUAGES).index(i18n.language))
         self.lang.currentIndexChanged.connect(self.change_language)
-        maps = s.value("maps", list(MAP_NAMES), type=list)
+        maps = s.value("maps", ["base", "hiver"], type=list)
         self.summer = QCheckBox(checked="base" in maps)
         self.winter = QCheckBox(checked="hiver" in maps)
+        self.velo = QCheckBox(checked="velo" in maps)
         map_choice = QHBoxLayout()
         map_choice.addWidget(self.summer)
         map_choice.addWidget(self.winter)
+        map_choice.addWidget(self.velo)
         map_choice.addStretch()
         self.dem = QCheckBox(checked=s.value("dem", True, type=bool))
         self.summer.toggled.connect(self.dem.setEnabled)   # the hill shading is part of the base map
         self.dem.setEnabled(self.summer.isChecked())
-        for box in (self.summer, self.winter):
+        for box in (self.summer, self.winter, self.velo):
             box.toggled.connect(self.update_summary)
         self.data_dir = PathEdit(s.value("data_dir", str(config.DATA_DIR)))
         self.output_dir = PathEdit(s.value("output_dir", ""))
@@ -567,6 +569,9 @@ class MainWindow(QMainWindow):
         self.summer.setText(tr("Été (carte de base)"))
         self.summer.setToolTip(tr("Carte topographique pour toute l'année"))
         self.winter.setText(tr("Hiver (surcouche)"))
+        self.velo.setText(tr("Vélo (surcouche)"))
+        self.velo.setToolTip(tr("Itinéraires vélo et VTT (SuisseMobile en Suisse, OpenStreetMap ailleurs) :\n"
+                                "surcouche transparente à afficher par-dessus la carte de base"))
         self.winter.setToolTip(tr("Pentes, itinéraires de ski et de raquettes, zones de tranquillité (Suisse), "
                                   "réserves naturelles :\nsurcouche transparente à afficher par-dessus la carte de base"))
         self.lang.setToolTip(tr("Langue de la fenêtre et des étiquettes de la carte"))
@@ -596,7 +601,8 @@ class MainWindow(QMainWindow):
         return Path(self.output_dir.text() or Path(self.data_dir.text()) / "output").expanduser()
 
     def maps(self) -> list[str]:
-        return [m for m, box in (("base", self.summer), ("hiver", self.winter)) if box.isChecked()]
+        return [m for m, box in (("base", self.summer), ("hiver", self.winter), ("velo", self.velo))
+                if box.isChecked()]
 
     def save_settings(self):
         s = self.settings
@@ -619,7 +625,8 @@ class MainWindow(QMainWindow):
         area = sum(z["area_km2"] for z in selected)
         text = tr("Surface : <b>{area} km²</b>", area=thousands(area)) + "<br>"
         if maps := self.maps():
-            names = tr(" et ").join(tr(MAP_NAMES[m]) for m in maps)
+            words = [tr(MAP_NAMES[m]) for m in maps]   # "été, hiver et vélo"
+            names = tr(" et ").join([", ".join(words[:-1]), words[-1]] if len(words) > 1 else words)
             text += tr("Taille estimée : <b>≈ {size}</b> ({maps})",
                        size=file_size(estimate_mb(selected, maps)), maps=names)
         else:
@@ -672,7 +679,7 @@ class MainWindow(QMainWindow):
             build_args.append("--basecamp")
         if self.force.isChecked():
             build_args.append("--force")
-        self.steps = [("Téléchargement des données…", "download", ["--coverage", spec]),
+        self.steps = [("Téléchargement des données…", "download", ["--coverage", spec, "--maps", *self.maps()]),
                       ("Construction des cartes…", "build", build_args)]
         self.log.clear()
         self.append_log(tr("Couverture : {spec}", spec=spec))

@@ -7,6 +7,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-22
+
+### Added
+
+- Cycling overlay (`--maps velo`, **Vélo (surcouche)** in the window), a third transparent map: cycling
+  routes by network level and mountain bike routes by difficulty, with single trails and route numbers.
+  SwitzerlandMobility (Veloland, Mountainbikeland) in Switzerland and Liechtenstein, the bicycle and
+  mtb routes of OpenStreetMap elsewhere, read from the Geofabrik extracts (French regions included).
+
+### Fixed
+
+- Geofabrik moved each extract into its own folder: the Italian, Spanish and German extracts could no
+  longer be downloaded.
+- Downloads wait and try again while a server is unavailable (Geofabrik answered "503" for minutes) or the
+  network drops, resuming the partial file.
+
 ## [0.8.0] - 2026-11-18
 
 ### Added
@@ -219,7 +235,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-swisstopo/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/dustag/garmin-swisstopo/compare/v0.7.0...v0.7.1

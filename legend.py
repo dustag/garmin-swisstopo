@@ -162,7 +162,22 @@ WINTER = [
         icon(["..x..", ".xxx.", "xxxxx", ".xxx.", "..x.."], {"x": SKI}), extra=["FontStyle=SmallFont"]),
 ]
 
-MAPS = {"base": BASE, "hiver": WINTER}
+# --- Cycling overlay (transparent) ------------------------------------------------
+
+VELO_BLUE = "#1E6FD9"
+VELO = [
+    # Cycling routes (SwitzerlandMobility blue), wider for the higher network levels
+    Cat("velo_national", "line", 0x01, 17, line(VELO_BLUE, 4, "#FFFFFF")),
+    Cat("velo_regional", "line", 0x02, 18, line(VELO_BLUE, 3)),
+    Cat("velo_local", "line", 0x03, 20, line("#5AA0F0", 2)),
+    # Mountain bike routes, darker for the harder ones, single trails dashed on top
+    Cat("mtb_easy", "line", 0x04, 19, line("#F39200", 3)),
+    Cat("mtb_medium", "line", 0x05, 19, line("#E2541B", 3)),
+    Cat("mtb_difficult", "line", 0x06, 19, line("#A3240F", 3)),
+    Cat("mtb_singletrail", "line", 0x07, 21, dashed("#4A2200", 2, 4, 3), name=None),
+]
+
+MAPS = {"base": BASE, "hiver": WINTER, "velo": VELO}
 
 
 # --- Legend labels ----------------------------------------------------------------------
@@ -172,6 +187,15 @@ LANGS = ("fr", "de", "it", "en")
 GARMIN_LANG = {"fr": 0x01, "de": 0x02, "en": 0x04, "it": 0x05}
 
 LABELS = {  # key: (fr, de, it, en)
+    "velo_national": ("Itinéraire vélo national", "Nationale Veloroute", "Itinerario ciclabile nazionale",
+                      "National cycle route"),
+    "velo_regional": ("Itinéraire vélo régional", "Regionale Veloroute", "Itinerario ciclabile regionale",
+                      "Regional cycle route"),
+    "velo_local": ("Itinéraire vélo local", "Lokale Veloroute", "Itinerario ciclabile locale", "Local cycle route"),
+    "mtb_easy": ("VTT facile", "Mountainbike leicht", "MTB facile", "Mountain bike, easy"),
+    "mtb_medium": ("VTT moyen", "Mountainbike mittel", "MTB medio", "Mountain bike, medium"),
+    "mtb_difficult": ("VTT difficile", "Mountainbike schwierig", "MTB difficile", "Mountain bike, difficult"),
+    "mtb_singletrail": ("Single trail", "Singletrail", "Single trail", "Single trail"),
     "land": ("Fond de carte", "Kartenhintergrund", "Sfondo", "Map background"),
     "rock": ("Rocher", "Fels", "Roccia", "Rock"),
     "scree": ("Éboulis", "Geröll", "Detriti", "Scree"),

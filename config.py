@@ -71,6 +71,8 @@ ITALY_FAMILY_ID = 6800
 OSM_FAMILY_ID = 9000
 # Combined coverages ("a+b"): family id = 7000 + 2 * (stable hash of the spec % 1000)
 COMBINED_FAMILY_ID = 7000
+# The cycling overlay of a coverage: its family id + VELO_FAMILY_OFFSET (base: +0, winter: +1)
+VELO_FAMILY_OFFSET = 20000
 FAMILY_NAME = "Swisstopo"
 
 # Label language: fr, de, it or en. Place names always stay in their official local form.
@@ -181,5 +183,10 @@ SOURCES = {
     "tlm3d": "https://data.geo.admin.ch/ch.swisstopo.swisstlm3d/swisstlm3d_2026-02/swisstlm3d_2026-02_2056_5728.gpkg.zip",
     "skitouren": "https://data.geo.admin.ch/ch.swisstopo-karto.skitouren/skitouren/skitouren_2056.gpkg.zip",
     "schneeschuh": "https://data.geo.admin.ch/ch.swisstopo-karto.schneeschuhrouten/schneeschuhrouten/schneeschuhrouten_2056.gpkg.zip",
+}
+# Cycling and mountain bike routes of SwitzerlandMobility (FEDRO / SchweizMobil, cantons)
+VELO_SOURCES = {
+    "veloland": "https://data.geo.admin.ch/ch.astra.veloland/veloland/veloland_2056.gpkg",
+    "mountainbikeland": "https://data.geo.admin.ch/ch.astra.mountainbikeland/mountainbikeland/mountainbikeland_2056.gpkg",
 }
 # Wildlife quiet zones / protection areas and boundaries are queried from the geo.admin API

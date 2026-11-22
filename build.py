@@ -4,7 +4,8 @@
     python build.py --coverage canton:VS     # area, switzerland, canton:XX, dept:NN, it:XX, at:XX, alpes...
     python build.py --no-dem                 # without hill shading
     python build.py --basecamp               # also a copy for Garmin BaseCamp (output/basecamp)
-    python build.py --maps hiver             # only the winter overlay (base, hiver or both)
+    python build.py --maps hiver             # only the winter overlay (base, hiver, velo)
+    python build.py --maps base hiver velo   # also the cycling overlay
     python build.py --step osm               # only build the tiles (OSM / elevation samples)
     python build.py --step mkgmap            # only compile (tiles already built)
     python build.py --force                  # rebuild tiles even if already built
@@ -38,6 +39,7 @@ from skimage.measure import find_contours
 import config
 import coverage
 import countries
+import cycling
 import france
 import osmzone
 import legend
@@ -51,6 +53,7 @@ DEM_RES = 5.0     # m
 DEM_MARGIN = 100  # m of terrain read around a tile, so contours and slopes match across tiles
 TILE_FORMAT = 4   # bump to invalidate already built tiles when the tile content changes
 CH_FORMAT = 2     # the same, for the Swiss content only (tiles without Switzerland are kept)
+VELO_FORMAT = 1   # the same, for the cycling overlay
 
 
 # --- Digital elevation model -----------------------------------------------------
@@ -413,7 +416,7 @@ def write_wildlife(ctx: TileContext, osm: OsmWriter):
 
 # --- Tile build -------------------------------------------------------------------------
 
-LAYERS = (("base", 0), ("hiver", 1))
+LAYERS = (("base", 0), ("hiver", 1), ("velo", 2))
 
 
 def tile_osm(tile: Tile, layer_key: str):
@@ -426,6 +429,44 @@ def french_depts(tile: Tile):
     return [c for c in config.FRANCE_DEPTS if france.is_ready(c) and coverage.dept_outline(c).intersects(box)]
 
 
+
+
+def tile_parts(tile: Tile, depts, zones):
+    """The tile, and the parts of it filled by each French department and each zone."""
+    ctx = TileContext(tile)
+    french = [ft for ft in (france.FrenchTile(ctx, c) for c in depts) if not ft.empty]
+    others = []
+    if zones:
+        # Switzerland and the French departments keep priority over the OpenStreetMap zones
+        box = shapely.box(*tile.bounds).buffer(500)
+        foreign = shapely.union_all([shapely.intersection(shapely.make_valid(g), box) for g in
+                                     [coverage.switzerland()] + [coverage.dept_outline(c) for c in depts]])
+        outlines = {z.key: shapely.intersection(shapely.make_valid(z.outline()), box) for z in zones}
+        others = osmzone.zone_tiles(ctx, zones, foreign, outlines)
+    return ctx, french, others
+
+
+def build_velo(tile: Tile, force=False):
+    """Build the cycling overlay of one tile (its own status: velo.json); returns a status dict."""
+    status_file = config.TILES_DIR / tile.name / "velo.json"
+    depts, zones = french_depts(tile), countries.in_tile(tile.bounds)
+    key = cycling.sources(depts, zones, france.dept_dir)
+    if not force and status_file.exists():
+        status = json.loads(status_file.read_text())
+        if (status.get("format"), status.get("sources")) == (VELO_FORMAT, key):
+            return status | {"cached": True}
+    ctx, french, others = tile_parts(tile, depts, zones)
+    with OsmWriter(tile_osm(tile, "velo")) as osm:
+        if coverage.switzerland().intersects(shapely.box(*tile.bounds)):
+            cycling.write_swiss(ctx, osm)
+        for ft in french:
+            cycling.write_osm(ft, france.dept_dir(ft.code), osm)
+        for zt in others:
+            cycling.write_osm(zt, zt.zone.dir, osm)
+        count = osm.count
+    status = {"tile": tile.name, "format": VELO_FORMAT, "sources": key, "counts": {"velo": count}}
+    status_file.write_text(json.dumps(status))
+    return status
 
 
 def build_tile(tile: Tile, force=False):
@@ -454,16 +495,7 @@ def build_tile(tile: Tile, force=False):
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
 
-    ctx = TileContext(tile)
-    french = [ft for ft in (france.FrenchTile(ctx, c) for c in depts) if not ft.empty]
-    others = []
-    if zones:
-        # Switzerland and the French departments keep priority over the OpenStreetMap zones
-        box = shapely.box(*tile.bounds).buffer(500)
-        foreign = shapely.union_all([shapely.intersection(shapely.make_valid(g), box) for g in
-                                     [coverage.switzerland()] + [coverage.dept_outline(c) for c in depts]])
-        outlines = {z.key: shapely.intersection(shapely.make_valid(z.outline()), box) for z in zones}
-        others = osmzone.zone_tiles(ctx, zones, foreign, outlines)
+    ctx, french, others = tile_parts(tile, depts, zones)
     e0, n0, e1, n1 = tile.bounds
     dem = Dem((e0 - DEM_MARGIN, n0 - DEM_MARGIN, e1 + DEM_MARGIN, n1 + DEM_MARGIN))
     counts = {}
@@ -496,7 +528,7 @@ def build_tile(tile: Tile, force=False):
     return status
 
 
-def build_tiles(cov: coverage.Coverage, jobs: int, force: bool):
+def build_tiles(cov: coverage.Coverage, jobs: int, force: bool, maps=("base", "hiver")):
     in_ch = coverage.switzerland().intersects(shapely.union_all([shapely.box(*t.bounds) for t in cov.tiles]))
     if in_ch and TLM is None:
         raise SystemExit("swissTLM3D not found: run download.py first")
@@ -507,9 +539,21 @@ def build_tiles(cov: coverage.Coverage, jobs: int, force: bool):
         coverage.dept_outline(code)
     for zone in countries.configured():
         zone.outline()
+    failed = []
+    if "base" in maps or "hiver" in maps:
+        failed += _run(cov, jobs, build_tile, force)
+    if "velo" in maps:
+        print("Cycling overlay...")
+        failed += _run(cov, jobs, build_velo, force)
+    if failed:
+        raise SystemExit(f"{len(failed)} tile(s) failed: {', '.join(failed)}")
+
+
+def _run(cov: coverage.Coverage, jobs: int, build, force: bool):
+    """Build every tile of the coverage in parallel; returns the names of the failed ones."""
     done, failed = 0, []
     with ProcessPoolExecutor(jobs) as pool:
-        futures = {pool.submit(build_tile, t, force): t for t in cov.tiles}
+        futures = {pool.submit(build, t, force): t for t in cov.tiles}
         for fut in as_completed(futures):
             done += 1
             try:
@@ -521,10 +565,9 @@ def build_tiles(cov: coverage.Coverage, jobs: int, force: bool):
                 traceback.print_exc()
                 continue
             note = " (cached)" if s.get("cached") else ""
-            print(f"  [{done}/{len(cov.tiles)}] {s['tile']}: base {s['counts']['base']}, "
-                  f"hiver {s['counts']['hiver']} objects{note}", flush=True)
-    if failed:
-        raise SystemExit(f"{len(failed)} tile(s) failed: {', '.join(failed)}")
+            counts = ", ".join(f"{k} {v}" for k, v in s["counts"].items())
+            print(f"  [{done}/{len(cov.tiles)}] {s['tile']}: {counts} objects{note}", flush=True)
+    return failed
 
 
 # --- mkgmap compilation -----------------------------------------------------------------
@@ -533,7 +576,7 @@ MKGMAP = next(config.TOOLS_DIR.glob("mkgmap-latest/mkgmap-*/mkgmap.jar"), None)
 LEVELS = "0:24, 1:23, 2:21, 3:19, 4:17"
 DEM_DISTS = "3312,6624,13248,26512,53024"   # one per level
 # Above Garmin's own maps (mkgmap default 25), winter overlay on top
-DRAW_PRIORITY = {"base": 40, "hiver": 41}
+DRAW_PRIORITY = {"base": 40, "hiver": 41, "velo": 42}
 # Started by the window, without a console (Windows): no console window for Java, its output
 # goes to the window's log with ours
 NO_CONSOLE = ({"creationflags": subprocess.CREATE_NO_WINDOW, "stdout": sys.stdout, "stderr": subprocess.STDOUT}
@@ -547,7 +590,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None, base
     out.mkdir(parents=True)
     style = work / f"style_{layer_key}"
     legend.write_style(layer_key, style, LEVELS)
-    family_id = cov.family_id + dict(LAYERS)[layer_key]
+    family_id = cov.family_id + (config.VELO_FAMILY_OFFSET if layer_key == "velo" else dict(LAYERS)[layer_key])
     # mkgmap names the TYP inside the map after this file: the name must be a valid 8.3 Garmin
     # name, without a dot, or the device ignores the TYP and draws its own default styles
     typ = work / f"{family_id}.txt"
@@ -560,8 +603,8 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None, base
             # Garmin names are limited to 50 characters
             f"family-id={family_id}", "product-id=1", f"family-name={title[:50]}", f"series-name={title[:50]}",
             f"area-name={cov.name[:50]}", f"draw-priority={DRAW_PRIORITY[layer_key]}",
-            "copyright-message=(c) swisstopo, OFEV/BAFU, CAS/SAC, IGN, INGV, BEV/geoland, LDBV, IGN-ES, "
-            "Copernicus, OpenStreetMap, Camptocamp",
+            "copyright-message=(c) swisstopo, OFEV/BAFU, OFROU/SuisseMobile, CAS/SAC, IGN, INGV, BEV/geoland, "
+            "LDBV, IGN-ES, Copernicus, OpenStreetMap, Camptocamp",
             "merge-lines",
             # Both maps are transparent: the base map is made opaque by its "land"
             # polygon over Switzerland only, so other maps still show abroad.
@@ -573,7 +616,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None, base
         opts += [f"dem={dem_dir}", f"dem-dists={DEM_DISTS}", "show-profiles=1"]
     inputs = 0
     for t in cov.tiles:
-        status_file = config.TILES_DIR / t.name / "status.json"
+        status_file = config.TILES_DIR / t.name / ("velo.json" if layer_key == "velo" else "status.json")
         if not status_file.exists():
             raise SystemExit(f"tile {t.name} not built: run build.py --step osm first")
         status = json.loads(status_file.read_text())
@@ -609,8 +652,8 @@ def main():
     ap.add_argument("--no-dem", action="store_true", help="without hill shading")
     ap.add_argument("--basecamp", action="store_true",
                     help="also a copy for Garmin BaseCamp, in OUTPUT_DIR/basecamp (copy it to C:\\ProgramData\\Garmin\\Maps)")
-    ap.add_argument("--maps", nargs="+", choices=["base", "hiver"], default=["base", "hiver"],
-                    help="maps to compile: base map, winter overlay or both")
+    ap.add_argument("--maps", nargs="+", choices=["base", "hiver", "velo"], default=["base", "hiver"],
+                    help="maps to build: base map, winter overlay, cycling overlay")
     ap.add_argument("--step", choices=["all", "osm", "mkgmap"], default="all")
     ap.add_argument("--force", action="store_true", help="rebuild tiles even if already built")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 1))
@@ -620,7 +663,7 @@ def main():
     print(f"Coverage {cov.name}: {len(cov.tiles)} tiles of {config.TILE_SIZE // 1000} km, family id {cov.family_id}")
     if args.step in ("all", "osm"):
         print("Tiles...")
-        build_tiles(cov, args.jobs, args.force)
+        build_tiles(cov, args.jobs, args.force, args.maps)
     if args.step in ("all", "mkgmap"):
         if "base" in args.maps:
             dem_dir = None
@@ -633,6 +676,9 @@ def main():
         if "hiver" in args.maps:
             print("mkgmap winter...")
             mkgmap(cov, "hiver", args.jobs, basecamp=args.basecamp)
+        if "velo" in args.maps:
+            print("mkgmap cycling...")
+            mkgmap(cov, "velo", args.jobs, basecamp=args.basecamp)
 
 
 if __name__ == "__main__":

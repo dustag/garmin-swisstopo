@@ -32,6 +32,7 @@ the maps.
 |---|---|---|
 | `swisstopo_<coverage>_base.img` | Contour lines (10/50/100 m), rock, scree, glaciers, forest, water, buildings, roads, paths with the Swiss hiking colours (yellow / red / blue), roads carrying a hiking route edged with its colour, aerial ropeways, summits with elevation, passes, huts, place names, hill shading | All year |
 | `swisstopo_<coverage>_hiver.img` | Transparent overlay: slope classes 30-35° / 35-40° / 40-45° / > 45°, ski touring network with uphill/downhill arrows, "on foot" and "increased caution" sections, route numbers with SAC grade, snowshoe routes, wildlife quiet zones and protection areas with their allowed routes | Winter |
+| `swisstopo_<coverage>_velo.img` (optional, `--maps velo`) | Transparent overlay: cycling routes in blue, wider for the national and regional ones, mountain bike routes in orange to dark red after their difficulty, single trails dashed, with the route numbers: SwitzerlandMobility in Switzerland, OpenStreetMap elsewhere | Cycling, mountain bike |
 
 Outside Switzerland the content is as close as the open data allows:
 
@@ -252,7 +253,8 @@ Both scripts take the coverage from `.env` or from `--coverage`. `build.py` has 
 python build.py --coverage canton:VS     # build another coverage
 python build.py --no-dem                 # no hill shading (smaller map)
 python build.py --basecamp               # also a copy for Garmin BaseCamp (see "Viewing the maps on a PC")
-python build.py --maps hiver             # only the winter overlay (base, hiver or both)
+python build.py --maps hiver             # only the winter overlay (base, hiver, velo)
+python build.py --maps base hiver velo   # also the cycling overlay (download.py needs --maps velo too)
 python build.py --step osm               # only build the tiles
 python build.py --step mkgmap            # only compile (after editing legend.py, for example)
 python build.py --force                  # rebuild the tiles even if already built
@@ -408,10 +410,11 @@ activity**:
 
 This is also how you switch seasons:
 
-| Activity | Swisstopo base | Swisstopo hiver | TopoActive |
-|---|---|---|---|
-| Summer: *Hike*, *Mountaineering*… | on | off | **off** |
-| Winter: *Backcountry Ski*, *Snowshoe*… | on | on | **off** |
+| Activity | Swisstopo base | Swisstopo hiver | Swisstopo velo | TopoActive |
+|---|---|---|---|---|
+| Summer: *Hike*, *Mountaineering*… | on | off | off | **off** |
+| Winter: *Backcountry Ski*, *Snowshoe*… | on | on | off | **off** |
+| Cycling: *Bike*, *MTB*, *Gravel*… | on | off | on | **off** |
 
 Turn TopoActive off in these activities: otherwise it may be drawn instead of the Swisstopo map. Don't
 delete it from the Map Manager, since it remains useful in other activities and abroad.
@@ -475,6 +478,7 @@ share them:
 |---|---|---|
 | swissTLM3D, swissALTI3D, swissBOUNDARIES3D | © swisstopo | [Open Government Data, free use with attribution](https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices) |
 | Ski touring and snowshoe routes | © swisstopo, with the Swiss Alpine Club SAC | Same terms |
+| Cycling and mountain bike routes (Veloland, Mountainbikeland) | © FEDRO / ASTRA, SchweizMobil, cantons | [Open use, with attribution](https://opendata.swiss/en/terms-of-use) |
 | Wildlife quiet zones, wildlife protection areas | © FOEN / BAFU, cantons | [geo.admin.ch terms of use](https://www.geo.admin.ch/en/general-terms-of-use-fsdi) |
 | BD TOPO, RGE ALTI | © IGN | [Licence Ouverte / Etalab 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/), attribution |
 | Department outlines | geo.api.gouv.fr (IGN Admin Express) | Licence Ouverte / Etalab 2.0 |
