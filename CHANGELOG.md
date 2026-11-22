@@ -7,6 +7,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-22
+
+### Changed
+
+- Configuration window: the settings take a quarter of the screen width, the zone map the rest; the maps
+  to build are listed one per line and the labels sit above their fields.
+
 ## [0.10.0] - 2026-11-22
 
 ### Added
@@ -257,7 +264,8 @@ First release.
 - Instructions to install the maps on a Garmin fēnix 7X Pro, and to enable them per activity for summer
   and winter.
 
-[Unreleased]: https://github.com/dustag/garmin-openmaps/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/dustag/garmin-openmaps/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/dustag/garmin-openmaps/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/dustag/garmin-openmaps/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/dustag/garmin-openmaps/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/dustag/garmin-openmaps/compare/v0.7.2...v0.8.0
