@@ -21,7 +21,7 @@ from PySide6.QtCore import (QLibraryInfo, QLocale, QPointF, QProcess, QProcessEn
                             QTranslator, QUrl, Signal)
 from PySide6.QtGui import (QBrush, QColor, QDesktopServices, QFont, QFontDatabase, QFontMetricsF, QIcon,
                            QPainter, QPainterPath, QPainterPathStroker, QPen, QPixmap, QPolygonF, QTransform)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGraphicsItem,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGraphicsItem, QGridLayout,
                                QGraphicsPathItem, QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsScene,
                                QGraphicsSimpleTextItem,
                                QGraphicsView, QGroupBox, QHBoxLayout, QLabel,
@@ -449,10 +449,9 @@ class MainWindow(QMainWindow):
         self.winter = QCheckBox(checked="hiver" in maps)
         self.rando = QCheckBox(checked="rando" in maps)
         self.velo = QCheckBox(checked="velo" in maps)
-        map_choice = QHBoxLayout()
+        map_choice = QVBoxLayout()   # one per line: the side panel is narrow
         for box in (self.summer, self.winter, self.rando, self.velo):
             map_choice.addWidget(box)
-        map_choice.addStretch()
         self.dem = QCheckBox(checked=s.value("dem", True, type=bool))
         self.summer.toggled.connect(self.dem.setEnabled)   # the hill shading is part of the base map
         self.dem.setEnabled(self.summer.isChecked())
@@ -465,6 +464,7 @@ class MainWindow(QMainWindow):
                                                  "Tuiles en parallèle")}
         self.options = QGroupBox()
         form = QFormLayout(self.options)
+        form.setRowWrapPolicy(QFormLayout.WrapAllRows)   # labels above the fields
         form.addRow(self.labels["Cartes"], map_choice)
         form.addRow(self.labels["Langue"], self.lang)
         form.addRow("", self.dem)
@@ -482,6 +482,7 @@ class MainWindow(QMainWindow):
         self.force = QCheckBox()
         self.advanced = QGroupBox(visible=False)
         adv_form = QFormLayout(self.advanced)
+        adv_form.setRowWrapPolicy(QFormLayout.WrapAllRows)
         adv_form.addRow("Java", self.java)
         adv_form.addRow(self.labels["Tuiles en parallèle"], self.jobs)
         adv_form.addRow("", self.force)
@@ -495,10 +496,10 @@ class MainWindow(QMainWindow):
         self.cancel_button.clicked.connect(self.cancel)
         self.open_button = QPushButton()
         self.open_button.clicked.connect(self.open_output)
-        run_buttons = QHBoxLayout()
-        run_buttons.addWidget(self.start_button)
-        run_buttons.addWidget(self.cancel_button)
-        run_buttons.addWidget(self.open_button)
+        run_buttons = QGridLayout()
+        run_buttons.addWidget(self.start_button, 0, 0)
+        run_buttons.addWidget(self.cancel_button, 0, 1)
+        run_buttons.addWidget(self.open_button, 1, 0, 1, 2)
         self.status = QLabel(wordWrap=True)
         self.progress = QProgressBar(textVisible=False)
         self.progress.setRange(0, 1)
@@ -519,8 +520,8 @@ class MainWindow(QMainWindow):
         splitter = QSplitter()
         splitter.addWidget(self.map)
         splitter.addWidget(side)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 0)
         # Title at the top left, with the application icon
         logo = QLabel()
         logo.setPixmap(QIcon(str(ICON)).pixmap(36, 36))
@@ -550,15 +551,17 @@ class MainWindow(QMainWindow):
         if s.contains("geometry"):
             self.restoreGeometry(s.value("geometry"))
 
-        # The options keep the same width in every language: that of the widest one
-        current, widths = i18n.language, []
+        # The options take a quarter of the screen width, the map the rest; the same width in every
+        # language, at least what the widest one needs
+        current, widths = i18n.language, [self.screen().availableGeometry().width() // 4]
         for i18n.language in LANGUAGES:
             self.retranslate()
             # Take the new texts into account before measuring, nested layouts first
             for widget in reversed([side] + side.findChildren(QWidget)):
                 if widget.layout():
                     widget.layout().activate()
-            widths += [side.sizeHint().width(), self.advanced.sizeHint().width() + side_layout.contentsMargins().left() * 2]
+            widths += [side.minimumSizeHint().width(),
+                       self.advanced.minimumSizeHint().width() + side_layout.contentsMargins().left() * 2]
         i18n.language = current
         side.setFixedWidth(max(widths))
         self.retranslate()
