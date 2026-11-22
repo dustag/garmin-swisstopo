@@ -93,23 +93,11 @@ BASE = [
     Cat("river", "line", 0x1F, 19, line("#3D8FD6", 2)),
 
     # Transport
-    # Main roads white and wide: the colours are left to the hiking routes
+    # Main roads white and wide: the colours are left to the hiking overlay
     Cat("road_major", "line", 0x02, 17, line("#FFFFFF", 4, "#3C3C3C")),
     Cat("road", "line", 0x06, 19, line("#FFFFFF", 2, "#3C3C3C")),
     Cat("track", "line", 0x07, 21, line("#3C3C3C", 2)),
     Cat("path", "line", 0x16, 22, dashed("#3C3C3C", 1, 6, 3)),
-    # Swiss hiking signage (yellow / white-red-white / white-blue-white); Italian
-    # paths take the category matching their OpenStreetMap SAC scale
-    Cat("hike_t1", "line", 0x0F, 21, dashed("#E0A100", 3, 8, 3)),
-    Cat("hike_t2", "line", 0x10, 21, dashed("#E2001A", 3, 8, 3)),
-    Cat("hike_t3", "line", 0x11, 21, dashed("#0055C8", 3, 5, 4)),
-    # Roads carrying a hiking route: filled with the colour of the route
-    Cat("road_hike_t1", "line", 0x0B, 19, line("#F5C400", 3, "#3C3C3C")),
-    Cat("road_hike_t2", "line", 0x0C, 19, line("#E2001A", 3, "#3C3C3C")),
-    Cat("road_hike_t3", "line", 0x0D, 19, line("#0055C8", 3, "#3C3C3C")),
-    # French marked routes: GR (red-white) and other routes (yellow), drawn over the paths
-    Cat("hike_gr", "line", 0x12, 20, bitmap_line("#D7191C", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 3)),
-    Cat("hike_pr", "line", 0x13, 21, bitmap_line("#E0A100", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 3)),
     Cat("rail", "line", 0x14, 18, line("#202020", 2)),
     Cat("aerialway", "line", 0x1A, 20, bitmap_line("#202020", ["-" * 15 + "x" + "-" * 16, "x" * 32, "-" * 15 + "x" + "-" * 16])),
     Cat("powerline", "line", 0x29, 22, line("#8C8C8C", 1)),
@@ -162,6 +150,24 @@ WINTER = [
         icon(["..x..", ".xxx.", "xxxxx", ".xxx.", "..x.."], {"x": SKI}), extra=["FontStyle=SmallFont"]),
 ]
 
+# --- Hiking overlay (transparent) -------------------------------------------------
+
+# Drawn over the paths and roads of the base map
+RANDO = [
+    # Swiss hiking signage (yellow / white-red-white / white-blue-white); paths mapped
+    # from OpenStreetMap take the category matching their SAC scale
+    Cat("hike_t1", "line", 0x0F, 21, dashed("#E0A100", 3, 8, 3)),
+    Cat("hike_t2", "line", 0x10, 21, dashed("#E2001A", 3, 8, 3)),
+    Cat("hike_t3", "line", 0x11, 21, dashed("#0055C8", 3, 5, 4)),
+    # Roads carrying a hiking route: filled with the colour of the route
+    Cat("road_hike_t1", "line", 0x0B, 19, line("#F5C400", 3, "#3C3C3C")),
+    Cat("road_hike_t2", "line", 0x0C, 19, line("#E2001A", 3, "#3C3C3C")),
+    Cat("road_hike_t3", "line", 0x0D, 19, line("#0055C8", 3, "#3C3C3C")),
+    # French marked routes: GR (red-white) and other routes (yellow), drawn over the paths
+    Cat("hike_gr", "line", 0x12, 20, bitmap_line("#D7191C", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 3)),
+    Cat("hike_pr", "line", 0x13, 21, bitmap_line("#E0A100", ["x" * 8 + "-" * 2 + "x" * 4 + "-" * 2] * 3)),
+]
+
 # --- Cycling overlay (transparent) ------------------------------------------------
 
 VELO_BLUE = "#1E6FD9"
@@ -177,7 +183,7 @@ VELO = [
     Cat("mtb_singletrail", "line", 0x07, 21, dashed("#4A2200", 2, 4, 3), name=None),
 ]
 
-MAPS = {"base": BASE, "hiver": WINTER, "velo": VELO}
+MAPS = {"base": BASE, "hiver": WINTER, "rando": RANDO, "velo": VELO}
 
 
 # --- Legend labels ----------------------------------------------------------------------
@@ -286,7 +292,7 @@ def write_style(map_key: str, out_dir: Path, levels: str):
     cats = MAPS[map_key]
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "version").write_text("0\n")
-    (out_dir / "info").write_text(f"version: 1\nsummary: Swisstopo {map_key}\n")
+    (out_dir / "info").write_text(f"version: 1\nsummary: OpenMaps {map_key}\n")
     (out_dir / "options").write_text(f"levels = {levels}\n")
     for kind, fname in (("point", "points"), ("line", "lines"), ("polygon", "polygons")):
         (out_dir / fname).write_text("".join(_rule(c) for c in cats if c.kind == kind))

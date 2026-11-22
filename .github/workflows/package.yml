@@ -40,7 +40,7 @@ jobs:
         run: python packaging/build_app.py
       - uses: actions/upload-artifact@v4
         with:
-          name: swisstopo-garmin-${{ matrix.os }}
+          name: garmin-openmaps-${{ matrix.os }}
           path: |
             dist/*.zip
             dist/*.dmg
@@ -49,4 +49,4 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/swisstopo-garmin-* --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/garmin-openmaps-* --clobber

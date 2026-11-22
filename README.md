@@ -1,8 +1,10 @@
-# swisstopo-garmin
+# garmin-openmaps
 
-Build lightweight **vector maps for Garmin watches and handhelds** (tested target: fēnix 7X Pro) from the
-**free geodata of swisstopo**, with a **winter overlay** for ski touring: slope classes over 30°,
-ski touring and snowshoe routes, and wildlife quiet zones.
+Build lightweight **vector maps for Garmin watches and handhelds** (tested target: fēnix 7X Pro) from
+**open geodata**: swisstopo in Switzerland, IGN in France, OpenStreetMap and the national terrain models
+elsewhere. A base map comes with transparent overlays: **hiking** routes, a **winter overlay** for ski
+touring (slope classes over 30°, ski touring and snowshoe routes, wildlife quiet zones) and **cycling**
+routes.
 
 It was written for mountain leaders and ski tourers who need a map that sticks to the
 Swiss national map content in summer as well as in winter. Maps can cover a small area, one or several
@@ -30,9 +32,10 @@ the maps.
 
 | Map | Content | When to use it |
 |---|---|---|
-| `swisstopo_<coverage>_base.img` | Contour lines (10/50/100 m), rock, scree, glaciers, forest, water, buildings, roads, paths with the Swiss hiking colours (yellow / red / blue), roads carrying a hiking route edged with its colour, aerial ropeways, summits with elevation, passes, huts, place names, hill shading | All year |
-| `swisstopo_<coverage>_hiver.img` | Transparent overlay: slope classes 30-35° / 35-40° / 40-45° / > 45°, ski touring network with uphill/downhill arrows, "on foot" and "increased caution" sections, route numbers with SAC grade, snowshoe routes, wildlife quiet zones and protection areas with their allowed routes | Winter |
-| `swisstopo_<coverage>_velo.img` (optional, `--maps velo`) | Transparent overlay: cycling routes in blue, wider for the national and regional ones, mountain bike routes in orange to dark red after their difficulty, single trails dashed, with the route numbers: SwitzerlandMobility in Switzerland, OpenStreetMap elsewhere | Cycling, mountain bike |
+| `openmaps_<coverage>_base.img` | Contour lines (10/50/100 m), rock, scree, glaciers, forest, water, buildings, roads, paths, aerial ropeways, summits with elevation, passes, huts, place names, hill shading | All year |
+| `openmaps_<coverage>_rando.img` | Transparent overlay: hiking trails in the Swiss hiking colours (yellow / red / blue), roads carrying a hiking route filled with its colour, GR and other marked routes in France, paths after their OpenStreetMap SAC scale elsewhere | Hiking, all year |
+| `openmaps_<coverage>_hiver.img` | Transparent overlay: slope classes 30-35° / 35-40° / 40-45° / > 45°, ski touring network with uphill/downhill arrows, "on foot" and "increased caution" sections, route numbers with SAC grade, snowshoe routes, wildlife quiet zones and protection areas with their allowed routes | Winter |
+| `openmaps_<coverage>_velo.img` (optional, `--maps velo`) | Transparent overlay: cycling routes in blue, wider for the national and regional ones, mountain bike routes in orange to dark red after their difficulty, single trails dashed, with the route numbers: SwitzerlandMobility in Switzerland, OpenStreetMap elsewhere | Cycling, mountain bike |
 
 Outside Switzerland the content is as close as the open data allows:
 
@@ -86,13 +89,15 @@ flowchart LR
 
     BASE & CONT --> OSMB[base .osm.gz]
     SLOPE & WINTER --> OSMW[hiver .osm.gz]
+    BASE --> OSMR[rando .osm.gz]
     SAMP --> HGT[assemble_hgt<br/>.hgt.zip]
     LEG[legend.py<br/>categories, colours,<br/>labels] --> STY[mkgmap styles<br/>+ TYP files]
 
-    OSMB & OSMW & HGT & STY --> MK[[mkgmap<br/>one Garmin tile<br/>per grid tile]]
-    MK --> IMG1[/swisstopo_coverage_base.img/]
-    MK --> IMG2[/swisstopo_coverage_hiver.img/]
-    IMG1 & IMG2 --> W((Garmin watch))
+    OSMB & OSMR & OSMW & HGT & STY --> MK[[mkgmap<br/>one Garmin tile<br/>per grid tile]]
+    MK --> IMG1[/openmaps_coverage_base.img/]
+    MK --> IMG3[/openmaps_coverage_rando.img/]
+    MK --> IMG2[/openmaps_coverage_hiver.img/]
+    IMG1 & IMG3 & IMG2 --> W((Garmin watch))
 ```
 
 1. **`coverage.py`** turns a coverage into a list of tiles of a fixed **10 km × 10 km LV95 grid**. A coverage
@@ -175,19 +180,19 @@ DATA_DIR/
 
 ## Ready-to-use application
 
-The [releases](https://github.com/dustag/garmin-swisstopo/releases) have an application for Windows and
+The [releases](https://github.com/dustag/garmin-openmaps/releases) have an application for Windows and
 macOS that holds everything it needs (Python, the libraries, Java and mkgmap): nothing to install.
 
-- **Windows**: unzip `swisstopo-garmin-<version>-windows-x64.zip` anywhere and start
-  `swisstopo-garmin\swisstopo-garmin.exe`. The application is not signed: on the first start, Windows
+- **Windows**: unzip `garmin-openmaps-<version>-windows-x64.zip` anywhere and start
+  `garmin-openmaps\garmin-openmaps.exe`. The application is not signed: on the first start, Windows
   SmartScreen may show a warning, click **More info** then **Run anyway**.
-- **macOS 15 (Sequoia) or later**: open `swisstopo-garmin-<version>-macos-arm64.dmg` (Apple silicon: M1
-  and later) or `swisstopo-garmin-<version>-macos-x64.dmg` (Intel) and drag the application to
+- **macOS 15 (Sequoia) or later**: open `garmin-openmaps-<version>-macos-arm64.dmg` (Apple silicon: M1
+  and later) or `garmin-openmaps-<version>-macos-x64.dmg` (Intel) and drag the application to
   **Applications**. It is not signed by Apple: on the first start, macOS refuses to open it; go to
   **System Settings > Privacy & Security** and click **Open Anyway**.
 
-The data is downloaded to `swisstopo-data` in the home folder (about 20 GB for all of Switzerland), the
-folder can be changed in the window. Everything below is only needed to work on the code.
+The data is downloaded to `openmaps-data` in the home folder (about 20 GB for all of Switzerland;
+`swisstopo-data` before 0.10.0, still used when it is there), the folder can be changed in the window. Everything below is only needed to work on the code.
 
 ---
 
@@ -197,8 +202,8 @@ Requirements: **Python ≥ 3.11**, **Java ≥ 11** (for mkgmap), about **20 GB**
 internet connection.
 
 ```powershell
-git clone https://github.com/dustag/garmin-swisstopo.git
-cd garmin-swisstopo
+git clone https://github.com/dustag/garmin-openmaps.git
+cd garmin-openmaps
 python -m venv .venv
 .venv\Scripts\activate            # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
@@ -209,7 +214,7 @@ Edit `.env`:
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `DATA_DIR` | Where data is downloaded and processed. Keep it out of OneDrive/Dropbox. | `~/swisstopo-data` |
+| `DATA_DIR` | Where data is downloaded and processed. Keep it out of OneDrive/Dropbox. | `~/openmaps-data` |
 | `OUTPUT_DIR` | Where the final `.img` files go | `$DATA_DIR/output` |
 | `TOOLS_DIR` | Where mkgmap is unpacked | `./tools` |
 | `JAVA_EXE` | Java executable, if `java` is not in the PATH | `java` |
@@ -253,31 +258,31 @@ Both scripts take the coverage from `.env` or from `--coverage`. `build.py` has 
 python build.py --coverage canton:VS     # build another coverage
 python build.py --no-dem                 # no hill shading (smaller map)
 python build.py --basecamp               # also a copy for Garmin BaseCamp (see "Viewing the maps on a PC")
-python build.py --maps hiver             # only the winter overlay (base, hiver, velo)
-python build.py --maps base hiver velo   # also the cycling overlay (download.py needs --maps velo too)
+python build.py --maps hiver             # only the winter overlay (base, hiver, rando, velo)
+python build.py --maps base rando velo   # with the cycling overlay (download.py needs --maps velo too)
 python build.py --step osm               # only build the tiles
 python build.py --step mkgmap            # only compile (after editing legend.py, for example)
 python build.py --force                  # rebuild the tiles even if already built
 python build.py --jobs 4                 # number of tiles built in parallel (default: CPU cores - 1)
 ```
 
-The maps are written to `OUTPUT_DIR`, for example `swisstopo_telliers_base.img` and
-`swisstopo_telliers_hiver.img`.
+The maps are written to `OUTPUT_DIR`, for example `openmaps_telliers_base.img`,
+`openmaps_telliers_rando.img` and `openmaps_telliers_hiver.img`.
 
 ### Coverages
 
 | Coverage | Example | Map name on the device | Family id |
 |---|---|---|---|
-| Named area of `config.AREAS` | `telliers`, `chavornay` | `Swisstopo base telliers` | set in `AREAS` (6530, 6532…) |
-| All of Switzerland and Liechtenstein | `switzerland` | `Swisstopo base suisse` | 6520 |
-| One or several cantons | `canton:VS`, `canton:VS,VD` | `Swisstopo base vs-vd` | 6600 + 2 × canton index |
-| One or several French departments | `dept:74` | `Swisstopo base fr74` | 6700 + 2 × department number |
-| One or several cantons, with Liechtenstein (`LI`) | `canton:GR,LI` | `Swisstopo base gr-li` | as above |
-| One or several Italian zones, or all of `ITALY_ZONES` | `it:AO,TO`, `it` | `Swisstopo base itao-to` | 6800 + 2 × (ISTAT province code % 100) |
-| Austrian, German or Spanish zones, Andorra, or all the zones of a country | `at:AT334`, `at`, `de`, `es:ES241`, `ad` | `Swisstopo base at334` | 9000 + 2 × (hash of the codes % 1000) |
-| A region of `config.REGIONS`, without the tiles of the regions before it | `alpes-ouest`, `alpes-est`, `jura`, `pyrenees` | `Swisstopo base alpes-ouest` | as for `+` |
-| Any rectangle (LV95 metres) | `bbox:2570000,1080000,2600000,1100000` | `Swisstopo base custom` | 6590 |
-| Several of the above, joined with `+` | `canton:VS+dept:74` | `Swisstopo base vs+fr74` | 7000 + 2 × (hash of the coverage % 1000) |
+| Named area of `config.AREAS` | `telliers`, `chavornay` | `OpenMaps base telliers` | set in `AREAS` (6530, 6532…) |
+| All of Switzerland and Liechtenstein | `switzerland` | `OpenMaps base suisse` | 6520 |
+| One or several cantons | `canton:VS`, `canton:VS,VD` | `OpenMaps base vs-vd` | 6600 + 2 × canton index |
+| One or several French departments | `dept:74` | `OpenMaps base fr74` | 6700 + 2 × department number |
+| One or several cantons, with Liechtenstein (`LI`) | `canton:GR,LI` | `OpenMaps base gr-li` | as above |
+| One or several Italian zones, or all of `ITALY_ZONES` | `it:AO,TO`, `it` | `OpenMaps base itao-to` | 6800 + 2 × (ISTAT province code % 100) |
+| Austrian, German or Spanish zones, Andorra, or all the zones of a country | `at:AT334`, `at`, `de`, `es:ES241`, `ad` | `OpenMaps base at334` | 9000 + 2 × (hash of the codes % 1000) |
+| A region of `config.REGIONS`, without the tiles of the regions before it | `alpes-ouest`, `alpes-est`, `jura`, `pyrenees` | `OpenMaps base alpes-ouest` | as for `+` |
+| Any rectangle (LV95 metres) | `bbox:2570000,1080000,2600000,1100000` | `OpenMaps base custom` | 6590 |
+| Several of the above, joined with `+` | `canton:VS+dept:74` | `OpenMaps base vs+fr74` | 7000 + 2 × (hash of the coverage % 1000) |
 
 Orders of magnitude: Switzerland is about 500 tiles, Valais about 80, Haute-Savoie about 70, the Western
 Alps about 990, the Eastern Alps about 1130, the Jura about 220, the Pyrenees about 850. Built tiles are
@@ -390,8 +395,9 @@ maps, eTrex, GPSMAP…) work the same way, with slightly different menu names.
    ```
    Internal Storage/
    └── GARMIN/
-       ├── swisstopo_telliers_base.img
-       └── swisstopo_telliers_hiver.img
+       ├── openmaps_telliers_base.img
+       ├── openmaps_telliers_rando.img
+       └── openmaps_telliers_hiver.img
    ```
    Keep distinct file names. Do **not** rename the files `gmapsupp.img`, which could overwrite another map.
 4. Eject the watch properly and unplug it. It scans the new maps on restart, which can take a few
@@ -410,13 +416,13 @@ activity**:
 
 This is also how you switch seasons:
 
-| Activity | Swisstopo base | Swisstopo hiver | Swisstopo velo | TopoActive |
-|---|---|---|---|---|
-| Summer: *Hike*, *Mountaineering*… | on | off | off | **off** |
-| Winter: *Backcountry Ski*, *Snowshoe*… | on | on | off | **off** |
-| Cycling: *Bike*, *MTB*, *Gravel*… | on | off | on | **off** |
+| Activity | OpenMaps base | OpenMaps rando | OpenMaps hiver | OpenMaps velo | TopoActive |
+|---|---|---|---|---|---|
+| Summer: *Hike*, *Trail Run*, *Mountaineering*… | on | on | off | off | **off** |
+| Winter: *Backcountry Ski*, *Snowshoe*… | on | off | on | off | **off** |
+| Cycling: *Bike*, *MTB*, *Gravel*… | on | off | off | on | **off** |
 
-Turn TopoActive off in these activities: otherwise it may be drawn instead of the Swisstopo map. Don't
+Turn TopoActive off in these activities: otherwise it may be drawn instead of the OpenMaps map. Don't
 delete it from the Map Manager, since it remains useful in other activities and abroad.
 
 ### 3. Recommended map settings
@@ -441,7 +447,8 @@ only requires running `download.py` and `build.py --force` again.
 | Symptom | Cause / fix |
 |---|---|
 | The map does not appear in the Map Manager | File outside the `GARMIN` folder, or watch not restarted. Check the extension is `.img`. |
-| Garmin map shows instead of this one (no hiking trails in yellow / red / blue, no cream background) | TopoActive still enabled for the activity: turn it off in *Configure Maps* |
+| Garmin map shows instead of this one (no cream background) | TopoActive still enabled for the activity: turn it off in *Configure Maps* |
+| No hiking trails in yellow / red / blue | The *OpenMaps rando* overlay is not installed or not enabled for the activity |
 | Colours look like the Garmin map | Map Theme not set to *None* |
 | Slope stipple hides the terrain | Turn the winter overlay off for the activity, or change `STIPPLE` in `legend.py` to a sparser pattern |
 | No 10 m contour lines or labels | They only appear at the closest zoom levels; set Detail to *More* or *Most* |

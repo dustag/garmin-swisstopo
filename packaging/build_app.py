@@ -2,9 +2,9 @@
 
     python packaging/build_app.py
 
-Windows: dist/swisstopo-garmin-<version>-windows-x64.zip, a folder to unzip anywhere,
-with swisstopo-garmin.exe. macOS: dist/swisstopo-garmin-<version>-macos-<arch>.dmg,
-with swisstopo-garmin.app. Nothing else to install: the application holds Python, the
+Windows: dist/garmin-openmaps-<version>-windows-x64.zip, a folder to unzip anywhere,
+with garmin-openmaps.exe. macOS: dist/garmin-openmaps-<version>-macos-<arch>.dmg,
+with garmin-openmaps.app. Nothing else to install: the application holds Python, the
 libraries, a minimal Java runtime made with jlink, and mkgmap.
 
 Requirements: the packages of requirements.txt and packaging/requirements.txt, and a JDK
@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import config  # noqa: E402
 
-APP = "swisstopo-garmin"
+APP = "garmin-openmaps"
 
 # Intermediate files stay out of the repository: synced folders (OneDrive...) lock them
 WORK = Path(os.environ.get("APP_BUILD_DIR", Path(tempfile.gettempdir()) / f"{APP}-build"))

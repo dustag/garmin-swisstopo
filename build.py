@@ -4,8 +4,8 @@
     python build.py --coverage canton:VS     # area, switzerland, canton:XX, dept:NN, it:XX, at:XX, alpes...
     python build.py --no-dem                 # without hill shading
     python build.py --basecamp               # also a copy for Garmin BaseCamp (output/basecamp)
-    python build.py --maps hiver             # only the winter overlay (base, hiver, velo)
-    python build.py --maps base hiver velo   # also the cycling overlay
+    python build.py --maps hiver             # only the winter overlay (base, hiver, rando, velo)
+    python build.py --maps base rando velo   # summer maps: base, hiking and cycling overlays
     python build.py --step osm               # only build the tiles (OSM / elevation samples)
     python build.py --step mkgmap            # only compile (tiles already built)
     python build.py --force                  # rebuild tiles even if already built
@@ -51,7 +51,7 @@ SKI = config.DOWNLOAD_DIR / "skitouren_2056.gpkg"
 SNOWSHOE = config.DOWNLOAD_DIR / "schneeschuhrouten_2056.gpkg"
 DEM_RES = 5.0     # m
 DEM_MARGIN = 100  # m of terrain read around a tile, so contours and slopes match across tiles
-TILE_FORMAT = 4   # bump to invalidate already built tiles when the tile content changes
+TILE_FORMAT = 5   # bump to invalidate already built tiles when the tile content changes
 CH_FORMAT = 2     # the same, for the Swiss content only (tiles without Switzerland are kept)
 VELO_FORMAT = 1   # the same, for the cycling overlay
 
@@ -240,7 +240,7 @@ class TileContext:
         return e0 <= point.x < e1 and n0 <= point.y < n1
 
 
-def write_base(ctx: TileContext, osm: OsmWriter):
+def write_base(ctx: TileContext, osm: OsmWriter, rando: OsmWriter):
     clip = ctx.clip
     osm.add(clip(coverage.switzerland()), {"k": "land"})
     df = ctx.read("tlm_bb_bodenbedeckung", ["objektart"])
@@ -261,13 +261,14 @@ def write_base(ctx: TileContext, osm: OsmWriter):
         if kb == "Tunnel" or art not in ROADS:
             continue
         key = ROADS[art]
-        # Paths and tracks take the colour of their hiking category; roads that carry a hiking
-        # route (most of them on the Plateau) are edged with it
-        if key in ("track", "path") and hike in HIKING:
-            key = HIKING[hike]
-        elif key in ("road", "road_major") and hike in HIKING:
-            key = "road_" + HIKING[hike]
-        osm.add(clip(g), {"k": key, "name": name if key.startswith("road") else None})
+        g = clip(g)
+        osm.add(g, {"k": key, "name": name if key.startswith("road") else None})
+        # Hiking overlay: paths and tracks in the colour of their hiking category, roads that
+        # carry a hiking route (most of them on the Plateau) filled with it
+        if hike in HIKING and key in ("track", "path"):
+            rando.add(g, {"k": HIKING[hike]})
+        elif hike in HIKING and key in ("road", "road_major"):
+            rando.add(g, {"k": "road_" + HIKING[hike]})
 
     df = ctx.read("tlm_gewaesser_fliessgewaesser", ["objektart", "verlauf", "name"])
     for g, art, verlauf, name in zip(df.geometry, df.objektart, df.verlauf, df.name):
@@ -416,7 +417,7 @@ def write_wildlife(ctx: TileContext, osm: OsmWriter):
 
 # --- Tile build -------------------------------------------------------------------------
 
-LAYERS = (("base", 0), ("hiver", 1), ("velo", 2))
+LAYERS = (("base", 0), ("hiver", 1), ("velo", 2), ("rando", 3))
 
 
 def tile_osm(tile: Tile, layer_key: str):
@@ -492,23 +493,25 @@ def build_tile(tile: Tile, force=False):
                 == (TILE_FORMAT, config.LANG, fr_key, osm_formats, ch_key)
                 and all(status.get(c, []) == codes for c, codes in osm_zones.items())):
             return status | {"cached": True}
-    shutil.rmtree(out, ignore_errors=True)
-    out.mkdir(parents=True)
+    # Only this builder's files: the cycling overlay of the tile has its own status
+    out.mkdir(parents=True, exist_ok=True)
+    for f in [status_file, out / "hgt.npz"] + [tile_osm(tile, m) for m in ("base", "hiver", "rando")]:
+        f.unlink(missing_ok=True)
 
     ctx, french, others = tile_parts(tile, depts, zones)
     e0, n0, e1, n1 = tile.bounds
     dem = Dem((e0 - DEM_MARGIN, n0 - DEM_MARGIN, e1 + DEM_MARGIN, n1 + DEM_MARGIN))
     counts = {}
-    with OsmWriter(tile_osm(tile, "base")) as osm:
+    with OsmWriter(tile_osm(tile, "base")) as osm, OsmWriter(tile_osm(tile, "rando")) as rando:
         if dem.ok:
             write_contours(dem, osm, ctx.clip)
         if in_ch:
-            write_base(ctx, osm)
+            write_base(ctx, osm, rando)
         for ft in french:
-            france.write_base(ft, osm, dem)
+            france.write_base(ft, osm, dem, rando)
         for zt in others:
-            osmzone.write_base(zt, osm, dem)
-        counts["base"] = osm.count
+            osmzone.write_base(zt, osm, dem, rando)
+        counts["base"], counts["rando"] = osm.count, rando.count
     with OsmWriter(tile_osm(tile, "hiver")) as osm:
         if dem.ok:
             write_slopes(dem, osm, ctx.clip)
@@ -540,7 +543,7 @@ def build_tiles(cov: coverage.Coverage, jobs: int, force: bool, maps=("base", "h
     for zone in countries.configured():
         zone.outline()
     failed = []
-    if "base" in maps or "hiver" in maps:
+    if {"base", "hiver", "rando"} & set(maps):
         failed += _run(cov, jobs, build_tile, force)
     if "velo" in maps:
         print("Cycling overlay...")
@@ -576,7 +579,9 @@ MKGMAP = next(config.TOOLS_DIR.glob("mkgmap-latest/mkgmap-*/mkgmap.jar"), None)
 LEVELS = "0:24, 1:23, 2:21, 3:19, 4:17"
 DEM_DISTS = "3312,6624,13248,26512,53024"   # one per level
 # Above Garmin's own maps (mkgmap default 25), winter overlay on top
-DRAW_PRIORITY = {"base": 40, "hiver": 41, "velo": 42}
+DRAW_PRIORITY = {"base": 40, "hiver": 41, "rando": 42, "velo": 43}
+# Family id of each map = family id of the coverage + offset
+FAMILY_OFFSET = {"base": 0, "hiver": 1, "velo": config.VELO_FAMILY_OFFSET, "rando": config.RANDO_FAMILY_OFFSET}
 # Started by the window, without a console (Windows): no console window for Java, its output
 # goes to the window's log with ours
 NO_CONSOLE = ({"creationflags": subprocess.CREATE_NO_WINDOW, "stdout": sys.stdout, "stderr": subprocess.STDOUT}
@@ -590,7 +595,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None, base
     out.mkdir(parents=True)
     style = work / f"style_{layer_key}"
     legend.write_style(layer_key, style, LEVELS)
-    family_id = cov.family_id + (config.VELO_FAMILY_OFFSET if layer_key == "velo" else dict(LAYERS)[layer_key])
+    family_id = cov.family_id + FAMILY_OFFSET[layer_key]
     # mkgmap names the TYP inside the map after this file: the name must be a valid 8.3 Garmin
     # name, without a dot, or the device ignores the TYP and draws its own default styles
     typ = work / f"{family_id}.txt"
@@ -606,7 +611,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None, base
             "copyright-message=(c) swisstopo, OFEV/BAFU, OFROU/SuisseMobile, CAS/SAC, IGN, INGV, BEV/geoland, "
             "LDBV, IGN-ES, Copernicus, OpenStreetMap, Camptocamp",
             "merge-lines",
-            # Both maps are transparent: the base map is made opaque by its "land"
+            # All maps are transparent: the base map is made opaque by its "land"
             # polygon over Switzerland only, so other maps still show abroad.
             "transparent"]
     if basecamp:
@@ -620,7 +625,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None, base
         if not status_file.exists():
             raise SystemExit(f"tile {t.name} not built: run build.py --step osm first")
         status = json.loads(status_file.read_text())
-        if status["counts"][layer_key]:   # skip empty tiles
+        if status["counts"].get(layer_key):   # skip empty tiles
             # Garmin descriptions are limited to 50 characters
             opts += [f"mapname={t.map_id(dict(LAYERS)[layer_key])}", f"description={f'{title} {t.name}'[-50:]}",
                      f"input-file={tile_osm(t, layer_key)}"]
@@ -633,7 +638,7 @@ def mkgmap(cov: coverage.Coverage, layer_key: str, jobs: int, dem_dir=None, base
     args_file.write_text("\n".join(opts) + "\n", encoding="utf-8")
     subprocess.run([config.JAVA, f"-Xmx{config.JAVA_MAX_HEAP}", "-jar", str(MKGMAP), "-c", str(args_file)],
                    check=True, **NO_CONSOLE)
-    dest = config.OUTPUT_DIR / f"swisstopo_{cov.name}_{layer_key}.img"
+    dest = config.OUTPUT_DIR / f"openmaps_{cov.name}_{layer_key}.img"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(out / "gmapsupp.img", dest)
     print(f"  -> {dest} ({dest.stat().st_size / 1e6:.1f} MB)")
@@ -652,8 +657,9 @@ def main():
     ap.add_argument("--no-dem", action="store_true", help="without hill shading")
     ap.add_argument("--basecamp", action="store_true",
                     help="also a copy for Garmin BaseCamp, in OUTPUT_DIR/basecamp (copy it to C:\\ProgramData\\Garmin\\Maps)")
-    ap.add_argument("--maps", nargs="+", choices=["base", "hiver", "velo"], default=["base", "hiver"],
-                    help="maps to build: base map, winter overlay, cycling overlay")
+    ap.add_argument("--maps", nargs="+", choices=["base", "hiver", "rando", "velo"],
+                    default=["base", "hiver", "rando"],
+                    help="maps to build: base map, winter, hiking and cycling overlays")
     ap.add_argument("--step", choices=["all", "osm", "mkgmap"], default="all")
     ap.add_argument("--force", action="store_true", help="rebuild tiles even if already built")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 1))
@@ -676,6 +682,9 @@ def main():
         if "hiver" in args.maps:
             print("mkgmap winter...")
             mkgmap(cov, "hiver", args.jobs, basecamp=args.basecamp)
+        if "rando" in args.maps:
+            print("mkgmap hiking...")
+            mkgmap(cov, "rando", args.jobs, basecamp=args.basecamp)
         if "velo" in args.maps:
             print("mkgmap cycling...")
             mkgmap(cov, "velo", args.jobs, basecamp=args.basecamp)

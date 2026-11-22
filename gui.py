@@ -19,8 +19,8 @@ from pathlib import Path
 
 from PySide6.QtCore import (QLibraryInfo, QLocale, QPointF, QProcess, QProcessEnvironment, QRectF, QSettings, Qt,
                             QTranslator, QUrl, Signal)
-from PySide6.QtGui import (QBrush, QColor, QDesktopServices, QFont, QFontDatabase, QFontMetricsF, QPainter,
-                           QPainterPath, QPainterPathStroker, QPen, QPixmap, QPolygonF, QTransform)
+from PySide6.QtGui import (QBrush, QColor, QDesktopServices, QFont, QFontDatabase, QFontMetricsF, QIcon,
+                           QPainter, QPainterPath, QPainterPathStroker, QPen, QPixmap, QPolygonF, QTransform)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGraphicsItem,
                                QGraphicsPathItem, QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsScene,
                                QGraphicsSimpleTextItem,
@@ -37,15 +37,16 @@ import zones
 from i18n import tr
 
 REPO_DIR = Path(__file__).resolve().parent
-REPO_URL = "https://github.com/dustag/garmin-swisstopo"
+ICON = REPO_DIR / "icon.png"   # drawn by packaging/make_icon.py
+REPO_URL = "https://github.com/dustag/garmin-openmaps"
 COUNTRY_COLORS = {"ch": QColor("#d52b1e"), "fr": QColor("#2f5fb3"), "it": QColor("#2e8b57"),
                   "at": QColor("#a0522d"), "de": QColor("#505050"), "es": QColor("#d9822b"), "ad": QColor("#7b4fa0")}
 LANGUAGES = {"fr": "Français", "de": "Deutsch", "it": "Italiano", "en": "English"}
 # Average size of a 10 km tile per map (base with hill shading), measured on the Switzerland +
 # Haute-Savoie (1.04 + 0.77 MB), Switzerland + Haute-Savoie + Italy (0.97 + 0.82 MB) and Alps
 # with Austria and the Allgäu (0.92 + 0.87 MB) maps
-MB_PER_TILE = {"base": 0.95, "hiver": 0.85, "velo": 0.03}
-MAP_NAMES = {"base": "été", "hiver": "hiver", "velo": "vélo"}
+MB_PER_TILE = {"base": 0.95, "hiver": 0.85, "rando": 0.05, "velo": 0.03}
+MAP_NAMES = {"base": "été", "hiver": "hiver", "rando": "rando", "velo": "vélo"}
 # Regions with a selection button (texts translated in i18n.py)
 REGION_BUTTONS = {"jura": "Jura", "alpes-ouest": "Alpes occidentales", "alpes-est": "Alpes orientales"}
 PROGRESS = re.compile(r"\[?(\d+)\s*/\s*(\d+)\]?")
@@ -391,8 +392,12 @@ class PathEdit(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.settings = QSettings("swisstopo-garmin", "gui")
+        self.settings = QSettings("garmin-openmaps", "gui")
         s = self.settings
+        old = QSettings("swisstopo-garmin", "gui")   # name before 0.10.0
+        if not s.allKeys() and old.allKeys():
+            for key in old.allKeys():
+                s.setValue(key, old.value(key))
         lang = s.value("lang", "")
         i18n.language = lang if lang in LANGUAGES else default_language()
         self.qt_translator = QTranslator(self)
@@ -437,19 +442,21 @@ class MainWindow(QMainWindow):
             self.lang.addItem(name, code)
         self.lang.setCurrentIndex(list(LANGUAGES).index(i18n.language))
         self.lang.currentIndexChanged.connect(self.change_language)
-        maps = s.value("maps", ["base", "hiver"], type=list)
+        maps = s.value("maps", ["base", "hiver", "rando"], type=list)
+        if "base" in maps and not s.value("rando_split", False, type=bool):
+            maps.append("rando")   # the hiking routes were in the base map before 0.10.0
         self.summer = QCheckBox(checked="base" in maps)
         self.winter = QCheckBox(checked="hiver" in maps)
+        self.rando = QCheckBox(checked="rando" in maps)
         self.velo = QCheckBox(checked="velo" in maps)
         map_choice = QHBoxLayout()
-        map_choice.addWidget(self.summer)
-        map_choice.addWidget(self.winter)
-        map_choice.addWidget(self.velo)
+        for box in (self.summer, self.winter, self.rando, self.velo):
+            map_choice.addWidget(box)
         map_choice.addStretch()
         self.dem = QCheckBox(checked=s.value("dem", True, type=bool))
         self.summer.toggled.connect(self.dem.setEnabled)   # the hill shading is part of the base map
         self.dem.setEnabled(self.summer.isChecked())
-        for box in (self.summer, self.winter, self.velo):
+        for box in (self.summer, self.winter, self.rando, self.velo):
             box.toggled.connect(self.update_summary)
         self.data_dir = PathEdit(s.value("data_dir", str(config.DATA_DIR)))
         self.output_dir = PathEdit(s.value("output_dir", ""))
@@ -514,7 +521,23 @@ class MainWindow(QMainWindow):
         splitter.addWidget(side)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        self.setCentralWidget(splitter)
+        # Title at the top left, with the application icon
+        logo = QLabel()
+        logo.setPixmap(QIcon(str(ICON)).pixmap(36, 36))
+        self.title = QLabel()
+        font = self.title.font()
+        font.setPointSizeF(font.pointSizeF() * 1.6)
+        font.setBold(True)
+        self.title.setFont(font)
+        header = QHBoxLayout()
+        header.addWidget(logo)
+        header.addWidget(self.title)
+        header.addStretch()
+        central = QWidget()
+        central_layout = QVBoxLayout(central)
+        central_layout.addLayout(header)
+        central_layout.addWidget(splitter, 1)
+        self.setCentralWidget(central)
         credits = QLabel(f'© 2026 Antoine Gardiol · <a href="{REPO_URL}">{REPO_URL.removeprefix("https://")}</a>',
                          openExternalLinks=True)
         font = credits.font()
@@ -555,7 +578,8 @@ class MainWindow(QMainWindow):
         if self.qt_translator.load(f"qtbase_{i18n.language}", QLibraryInfo.path(QLibraryInfo.TranslationsPath)):
             QApplication.installTranslator(self.qt_translator)
 
-        self.setWindowTitle(tr("Cartes Garmin swisstopo"))
+        self.setWindowTitle(tr("Cartes Garmin OpenMaps"))
+        self.title.setText(tr("OpenMaps pour montres Garmin"))
         self.zone_box.setTitle(tr("Zones"))
         self.help.setText(tr("Cliquez sur la carte pour choisir les zones. "
                              "Molette pour zoomer, glisser pour se déplacer."))
@@ -569,6 +593,9 @@ class MainWindow(QMainWindow):
         self.summer.setText(tr("Été (carte de base)"))
         self.summer.setToolTip(tr("Carte topographique pour toute l'année"))
         self.winter.setText(tr("Hiver (surcouche)"))
+        self.rando.setText(tr("Randonnée (surcouche)"))
+        self.rando.setToolTip(tr("Chemins de randonnée balisés (jaune, rouge, bleu), sentiers GR :\n"
+                                 "surcouche transparente à afficher par-dessus la carte de base"))
         self.velo.setText(tr("Vélo (surcouche)"))
         self.velo.setToolTip(tr("Itinéraires vélo et VTT (SuisseMobile en Suisse, OpenStreetMap ailleurs) :\n"
                                 "surcouche transparente à afficher par-dessus la carte de base"))
@@ -601,14 +628,15 @@ class MainWindow(QMainWindow):
         return Path(self.output_dir.text() or Path(self.data_dir.text()) / "output").expanduser()
 
     def maps(self) -> list[str]:
-        return [m for m, box in (("base", self.summer), ("hiver", self.winter), ("velo", self.velo))
-                if box.isChecked()]
+        return [m for m, box in (("base", self.summer), ("hiver", self.winter), ("rando", self.rando),
+                                 ("velo", self.velo)) if box.isChecked()]
 
     def save_settings(self):
         s = self.settings
         s.setValue("zones", [f"{z['country']}:{z['code']}" for z in self.map.selected()])
         s.setValue("lang", self.lang.currentData())
         s.setValue("maps", self.maps())
+        s.setValue("rando_split", True)
         s.setValue("dem", self.dem.isChecked())
         s.setValue("basecamp", self.basecamp.isChecked())
         s.setValue("data_dir", self.data_dir.text())
@@ -776,6 +804,7 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(str(ICON)))
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
